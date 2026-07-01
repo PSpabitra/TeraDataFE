@@ -929,7 +929,29 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
                 {summary.completed} completed · {summary.failed} failed
               </div>
               <div style={{ marginTop: 10 }}>
-                <Btn onClick={() => onComplete(summary)} variant="success" size="sm" icon={<ChevronRight size={11} />}>View Summary</Btn>
+                <Btn onClick={() => {
+                  const details = selected.map(item => {
+                    const itemEvents = events.filter(e => e.item === item.name)
+                    const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.status === 'DATASET_SUCCESS' || e.status === 'PIPELINE_SUCCESS')
+                    const failed = itemEvents.some(e => e.status === 'ITEM_FAILED')
+                    const status = finished ? 'Success' : failed ? 'Failed' : 'Pending'
+                    
+                    const totalRows = item.row_count || 0
+                    const inserted = finished ? totalRows : 0
+                    const failedRows = failed ? totalRows : 0
+
+                    return {
+                      name: item.name,
+                      type: item.kind || 'dataset',
+                      sourceTable: item.name,
+                      targetTable: item.name,
+                      inserted: inserted,
+                      failedRows: failedRows,
+                      status: status
+                    }
+                  })
+                  onComplete({ ...summary, details })
+                }} variant="success" size="sm" icon={<ChevronRight size={11} />}>View Summary</Btn>
               </div>
             </div>
           )}
@@ -999,6 +1021,42 @@ const DoneStep = ({ summary, logs, onRestart }) => (
       </div>
     )}
     <Btn onClick={onRestart} variant="ghost" icon={<RefreshCw size={13} />}>Start New Migration</Btn>
+
+    {summary?.details && summary.details.length > 0 && (
+      <div style={{ width: '100%', maxWidth: 900, marginTop: 40, textAlign: 'left', background: 'var(--bg-card)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }} className="animate-fade">
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)' }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.05em' }}>Migration Details</h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['Resource', 'Type', 'Source', 'Target', 'Inserted', 'Failed', 'Status'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '10px 20px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {summary.details.map((d, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</td>
+                  <td style={{ padding: '12px 20px' }}>
+                    <Badge color={d.type === 'pipeline' ? 'violet' : 'cyan'} size="sm">{d.type?.toUpperCase()}</Badge>
+                  </td>
+                  <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.sourceTable}</td>
+                  <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.targetTable}</td>
+                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.inserted?.toLocaleString() : '—'}</td>
+                  <td style={{ padding: '12px 20px', fontSize: 12, color: d.failedRows > 0 ? 'var(--accent-red)' : 'var(--text-dim)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.failedRows?.toLocaleString() : '—'}</td>
+                  <td style={{ padding: '12px 20px' }}>
+                    <Badge color={d.status === 'Success' ? 'green' : d.status === 'Failed' ? 'red' : 'amber'} size="sm">{d.status}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
   </div>
 )
 
