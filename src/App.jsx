@@ -294,7 +294,8 @@ const LandingPage = ({ persona }) => {
 // ─── Step 1: Connect ──────────────────────────────────────────────────────────
 const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
   const [src, setSrc] = useState({ platform: 'teradata', host: '', username: '', password: '', database: '', port: '1025' })
-  const [tgt, setTgt] = useState({ platform: 'databricks', host: '', token: '', cluster_id: '', warehouse_id: '' })
+  const [tgt, setTgt] = useState({ platform: 'databricks', host: '', token: '', cluster_id: '', warehouse_id: '', username: '', password: '', database: '', schema: 'PUBLIC' })
+  const [savedCreds, setSavedCreds] = useState({})
   const [srcResult, setSrcResult] = useState(null)
   const [tgtResult, setTgtResult] = useState(null)
   const [srcLoading, setSrcLoading] = useState(false)
@@ -310,14 +311,67 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
         .then(res => res.json())
         .then(data => {
           if (data.credentials) {
+            const credsMap = {}
             data.credentials.forEach(c => {
-              if (c.platform === 'teradata') setSrc({ ...src, host: c.host || '', username: c.username || '', password: c.password || '', database: c.database_name || '', port: c.port || '1025' })
-              if (c.platform === 'databricks') setTgt({ ...tgt, host: c.host || '', token: c.token || '', cluster_id: c.cluster_id || '', warehouse_id: c.warehouse_id || '' })
+              credsMap[c.platform] = c
+              if (c.platform === 'teradata') {
+                setSrc(p => ({
+                  ...p,
+                  host: c.host || '',
+                  username: c.username || '',
+                  password: c.password || '',
+                  database: c.database_name || '',
+                  port: c.port || '1025'
+                }))
+              }
             })
+            setSavedCreds(credsMap)
+            const dbCred = data.credentials.find(c => c.platform === 'databricks')
+            const sfCred = data.credentials.find(c => c.platform === 'snowflake')
+            if (dbCred) {
+              setTgt({
+                platform: 'databricks',
+                host: dbCred.host || '',
+                token: dbCred.token || '',
+                cluster_id: dbCred.cluster_id || '',
+                warehouse_id: dbCred.warehouse_id || '',
+                username: '',
+                password: '',
+                database: ''
+              })
+            } else if (sfCred) {
+              setTgt({
+                platform: 'snowflake',
+                host: sfCred.host || '',
+                token: '',
+                cluster_id: '',
+                warehouse_id: sfCred.warehouse_id || '',
+                username: sfCred.username || '',
+                password: sfCred.password || '',
+                database: sfCred.database_name || '',
+                schema: sfCred.schema || 'PUBLIC'
+              })
+            }
           }
         }).catch(console.error)
     }
   }, [persona?.id])
+
+  const handlePlatformChange = (platform) => {
+    const cred = savedCreds[platform] || {}
+    setTgt({
+      platform,
+      host: cred.host || '',
+      token: cred.token || '',
+      cluster_id: cred.cluster_id || '',
+      warehouse_id: cred.warehouse_id || '',
+      username: cred.username || '',
+      password: cred.password || '',
+      database: cred.database_name || '',
+      schema: cred.schema || 'PUBLIC'
+    })
+    setTgtResult(null)
+  }
 
   const handleMsg = useCallback((msg) => {
     if (msg.type === 'connection_result') {
@@ -336,6 +390,8 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
           fetch(`${API}/api/v1/connections/save?persona_id=${persona.id}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(tgtRef.current)
+          }).then(() => {
+            setSavedCreds(prev => ({ ...prev, [tgtRef.current.platform]: tgtRef.current }))
           }).catch(console.error)
         }
       }
@@ -410,19 +466,81 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
       {/* Target */}
       <Card glow={tgtResult?.status === 'connected'}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-          <div style={{ padding: 7, background: 'rgba(139,92,246,0.1)', borderRadius: 'var(--radius)', border: '1px solid rgba(139,92,246,0.2)' }}>
-            <Cloud size={16} style={{ color: 'var(--accent-violet)' }} />
+          <div style={{
+            padding: 7,
+            background: tgt.platform === 'snowflake' ? 'rgba(56,189,248,0.1)' : 'rgba(139,92,246,0.1)',
+            borderRadius: 'var(--radius)',
+            border: `1px solid ${tgt.platform === 'snowflake' ? 'rgba(56,189,248,0.2)' : 'rgba(139,92,246,0.2)'}`
+          }}>
+            {tgt.platform === 'snowflake' ? (
+              <Database size={16} style={{ color: 'var(--accent-cyan)' }} />
+            ) : (
+              <Cloud size={16} style={{ color: 'var(--accent-violet)' }} />
+            )}
           </div>
           <div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600 }}>Target Platform</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Databricks Lakehouse</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+              {tgt.platform === 'snowflake' ? 'Snowflake Data Cloud' : 'Databricks Lakehouse'}
+            </div>
           </div>
-          {tgtResult && <Badge color={tgtResult.status === 'connected' ? 'green' : 'red'}>{tgtResult.status}</Badge>}
+          {tgtResult && <Badge color={tgtResult.status === 'connected' ? 'green' : 'red'} style={{ marginLeft: 'auto' }}>
+            {tgtResult.status}
+          </Badge>}
         </div>
-        <Field label="Workspace URL" value={tgt.host} onChange={v => setTgt(p => ({ ...p, host: v }))} placeholder="https://adb-xxx.azuredatabricks.net" required />
-        <Field label="Access Token" value={tgt.token} onChange={v => setTgt(p => ({ ...p, token: v }))} password placeholder="dapi..." required />
-        <Field label="Cluster ID" value={tgt.cluster_id} onChange={v => setTgt(p => ({ ...p, cluster_id: v }))} placeholder="0101-123456-abc" />
-        <Field label="SQL Warehouse ID" value={tgt.warehouse_id} onChange={v => setTgt(p => ({ ...p, warehouse_id: v }))} placeholder="abc123def" />
+
+        {/* Target Platform Toggle buttons */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          <button
+            type="button"
+            onClick={() => handlePlatformChange('databricks')}
+            style={{
+              flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
+              background: tgt.platform === 'databricks' ? 'var(--bg-active)' : 'transparent',
+              borderColor: tgt.platform === 'databricks' ? 'var(--border-bright)' : 'var(--border-dim)',
+              color: tgt.platform === 'databricks' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)', cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            Databricks
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePlatformChange('snowflake')}
+            style={{
+              flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
+              background: tgt.platform === 'snowflake' ? 'var(--bg-active)' : 'transparent',
+              borderColor: tgt.platform === 'snowflake' ? 'var(--border-bright)' : 'var(--border-dim)',
+              color: tgt.platform === 'snowflake' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)', cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            Snowflake
+          </button>
+        </div>
+
+        {tgt.platform === 'databricks' ? (
+          <>
+            <Field label="Workspace URL" value={tgt.host} onChange={v => setTgt(p => ({ ...p, host: v }))} placeholder="https://adb-xxx.azuredatabricks.net" required />
+            <Field label="Access Token" value={tgt.token} onChange={v => setTgt(p => ({ ...p, token: v }))} password placeholder="dapi..." required />
+            <Field label="Cluster ID" value={tgt.cluster_id} onChange={v => setTgt(p => ({ ...p, cluster_id: v }))} placeholder="0101-123456-abc" />
+            <Field label="SQL Warehouse ID" value={tgt.warehouse_id} onChange={v => setTgt(p => ({ ...p, warehouse_id: v }))} placeholder="abc123def" />
+          </>
+        ) : (
+          <>
+            <Field label="Account URL / Host" value={tgt.host} onChange={v => setTgt(p => ({ ...p, host: v }))} placeholder="xy12345.snowflakecomputing.com" required />
+            <Field label="Username" value={tgt.username || ''} onChange={v => setTgt(p => ({ ...p, username: v }))} placeholder="snowflake_user" required />
+            <Field label="Password" value={tgt.password || ''} onChange={v => setTgt(p => ({ ...p, password: v }))} password placeholder="••••••••" required />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Field label="Database" value={tgt.database || ''} onChange={v => setTgt(p => ({ ...p, database: v }))} placeholder="MY_DATABASE" />
+              <Field label="Warehouse" value={tgt.warehouse_id || ''} onChange={v => setTgt(p => ({ ...p, warehouse_id: v }))} placeholder="COMPUTE_WH" />
+            </div>
+            <Field label="Schema" value={tgt.schema || 'PUBLIC'} onChange={v => setTgt(p => ({ ...p, schema: v }))} placeholder="PUBLIC" />
+          </>
+        )}
+
         {tgtResult?.status === 'failed' && (
           <div style={{ padding: '8px 12px', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius)', marginBottom: 12, fontSize: 11, color: 'var(--accent-red)' }}>
             <AlertCircle size={12} style={{ display: 'inline', marginRight: 6 }} />{tgtResult.error}
@@ -431,7 +549,7 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
         {tgtResult?.status === 'connected' && (
           <div style={{ padding: '10px 12px', background: 'var(--green-dim)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 'var(--radius)', marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--accent-green)', fontWeight: 500, marginBottom: 6 }}>
-              <Check size={12} style={{ display: 'inline', marginRight: 5 }} />Connected as {tgtResult.user}
+              <Check size={12} style={{ display: 'inline', marginRight: 5 }} />Connected successfully
             </div>
             {tgtResult.metadata && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
@@ -445,10 +563,14 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
             )}
           </div>
         )}
-        <Btn onClick={connectTgt} disabled={tgtLoading || !tgt.host || !tgt.token || wsStatus !== 'connected'}
-          variant={tgtResult?.status === 'connected' ? 'success' : 'violet'} size="sm"
-          icon={tgtLoading ? <Spinner size={11} /> : <Cloud size={11} />}>
-          {tgtLoading ? 'Connecting...' : tgtResult?.status === 'connected' ? 'Reconnect' : 'Connect Databricks'}
+        <Btn onClick={connectTgt} disabled={
+          tgt.platform === 'databricks'
+            ? (tgtLoading || !tgt.host || !tgt.token || wsStatus !== 'connected')
+            : (tgtLoading || !tgt.host || !tgt.username || !tgt.password || wsStatus !== 'connected')
+        }
+          variant={tgtResult?.status === 'connected' ? 'success' : (tgt.platform === 'snowflake' ? 'primary' : 'violet')} size="sm"
+          icon={tgtLoading ? <Spinner size={11} /> : (tgt.platform === 'snowflake' ? <Database size={11} /> : <Cloud size={11} />)}>
+          {tgtLoading ? 'Connecting...' : tgtResult?.status === 'connected' ? 'Reconnect' : `Connect ${tgt.platform === 'databricks' ? 'Databricks' : 'Snowflake'}`}
         </Btn>
       </Card>
 
@@ -484,7 +606,7 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
   const startScan = () => {
     setScanning(true); setSrcResources(null); setTgtResources(null)
     send('discover_source', { platform: 'teradata', ...srcCfg })
-    setTimeout(() => send('discover_target', { platform: 'databricks', ...tgtCfg }), 800)
+    setTimeout(() => send('discover_target', { platform: tgtCfg.platform || 'databricks', ...tgtCfg }), 800)
   }
 
   const StatPill = ({ label, value, color = 'cyan' }) => (
@@ -603,8 +725,8 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
                 fontFamily: 'var(--font-mono)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6
               }}>
-                {t === 'source' ? <Database size={11} /> : <Cloud size={11} />}
-                {t === 'source' ? 'Teradata Source' : 'Databricks Target'}
+                {t === 'source' ? <Database size={11} /> : (tgtCfg?.platform === 'snowflake' ? <Database size={11} /> : <Cloud size={11} />)}
+                {t === 'source' ? 'Teradata Source' : `${tgtCfg?.platform === 'snowflake' ? 'Snowflake' : 'Databricks'} Target`}
                 {t === 'source' && srcResources && <Badge color="green" size="sm">✓</Badge>}
                 {t === 'target' && tgtResources && <Badge color="green" size="sm">✓</Badge>}
               </button>
@@ -825,7 +947,7 @@ const AnalyzeStep = ({ send, sourceResources, targetResources, onComplete }) => 
 }
 
 // ─── Step 4: Replicate ────────────────────────────────────────────────────────
-const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetResources, onComplete }) => {
+const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetResources, srcCfg, tgtCfg, onComplete }) => {
   const [events, setEvents] = useState([])
   const [started, setStarted] = useState(false)
   const [done, setDone] = useState(false)
@@ -854,7 +976,7 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
         columns: s.columns || [], row_count: s.row_count || 0, tags: s.tags || []
       })),
       source_platform: 'teradata',
-      target_platform: 'databricks',
+      target_platform: tgtCfg?.platform || 'databricks',
       gap_analysis: gapAnalysis?.gap_analysis || {}
     })
   }
@@ -930,6 +1052,9 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
               </div>
               <div style={{ marginTop: 10 }}>
                 <Btn onClick={() => {
+                  const srcPlatform = srcCfg?.platform ? srcCfg.platform.charAt(0).toUpperCase() + srcCfg.platform.slice(1) : 'Teradata'
+                  const tgtPlatform = tgtCfg?.platform ? tgtCfg.platform.charAt(0).toUpperCase() + tgtCfg.platform.slice(1) : 'Databricks'
+
                   const details = selected.map(item => {
                     const itemEvents = events.filter(e => e.item === item.name)
                     const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.status === 'DATASET_SUCCESS' || e.status === 'PIPELINE_SUCCESS')
@@ -943,8 +1068,8 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
                     return {
                       name: item.name,
                       type: item.kind || 'dataset',
-                      sourceTable: item.name,
-                      targetTable: item.name,
+                      sourceTable: srcPlatform,
+                      targetTable: tgtPlatform,
                       inserted: inserted,
                       failedRows: failedRows,
                       status: status
@@ -995,70 +1120,73 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
 }
 
 // ─── Step 5: Done ─────────────────────────────────────────────────────────────
-const DoneStep = ({ summary, logs, onRestart }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '40px 0' }} className="animate-fade">
-    <div style={{
-      width: 72, height: 72, borderRadius: '50%', background: 'var(--green-dim)',
-      border: '2px solid var(--accent-green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      marginBottom: 20, boxShadow: '0 0 30px rgba(16,185,129,0.25)'
-    }}>
-      <CheckCircle size={32} style={{ color: 'var(--accent-green)' }} />
-    </div>
-    <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Migration Complete</h2>
-    <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 28 }}>All selected resources have been migrated to Databricks</p>
-    {summary && (
-      <div style={{ display: 'flex', gap: 16, marginBottom: 32 }}>
-        {[
-          ['Total Items', summary.total, 'cyan'],
-          ['Completed', summary.completed, 'green'],
-          ['Failed', summary.failed, 'red'],
-        ].map(([l, v, c]) => (
-          <div key={l} style={{ padding: '16px 28px', background: 'var(--bg-card)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius-lg)' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: `var(--accent-${c})`, fontFamily: 'var(--font-display)' }}>{v}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4 }}>{l}</div>
-          </div>
-        ))}
+const DoneStep = ({ summary, logs, tgtCfg, onRestart }) => {
+  const tgtPlatform = tgtCfg?.platform ? tgtCfg.platform.charAt(0).toUpperCase() + tgtCfg.platform.slice(1) : 'Databricks'
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '40px 0' }} className="animate-fade">
+      <div style={{
+        width: 72, height: 72, borderRadius: '50%', background: 'var(--green-dim)',
+        border: '2px solid var(--accent-green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginBottom: 20, boxShadow: '0 0 30px rgba(16,185,129,0.25)'
+      }}>
+        <CheckCircle size={32} style={{ color: 'var(--accent-green)' }} />
       </div>
-    )}
-    <Btn onClick={onRestart} variant="ghost" icon={<RefreshCw size={13} />}>Start New Migration</Btn>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Migration Complete</h2>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 28 }}>All selected resources have been migrated to {tgtPlatform}</p>
+      {summary && (
+        <div style={{ display: 'flex', gap: 16, marginBottom: 32 }}>
+          {[
+            ['Total Items', summary.total, 'cyan'],
+            ['Completed', summary.completed, 'green'],
+            ['Failed', summary.failed, 'red'],
+          ].map(([l, v, c]) => (
+            <div key={l} style={{ padding: '16px 28px', background: 'var(--bg-card)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius-lg)' }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: `var(--accent-${c})`, fontFamily: 'var(--font-display)' }}>{v}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <Btn onClick={onRestart} variant="ghost" icon={<RefreshCw size={13} />}>Start New Migration</Btn>
 
-    {summary?.details && summary.details.length > 0 && (
-      <div style={{ width: '100%', maxWidth: 900, marginTop: 40, textAlign: 'left', background: 'var(--bg-card)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }} className="animate-fade">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)' }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.05em' }}>Migration Details</h3>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                {['Resource', 'Type', 'Source', 'Target', 'Inserted', 'Failed', 'Status'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '10px 20px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {summary.details.map((d, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <Badge color={d.type === 'pipeline' ? 'violet' : 'cyan'} size="sm">{d.type?.toUpperCase()}</Badge>
-                  </td>
-                  <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.sourceTable}</td>
-                  <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.targetTable}</td>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.inserted?.toLocaleString() : '—'}</td>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: d.failedRows > 0 ? 'var(--accent-red)' : 'var(--text-dim)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.failedRows?.toLocaleString() : '—'}</td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <Badge color={d.status === 'Success' ? 'green' : d.status === 'Failed' ? 'red' : 'amber'} size="sm">{d.status}</Badge>
-                  </td>
+      {summary?.details && summary.details.length > 0 && (
+        <div style={{ width: '100%', maxWidth: 900, marginTop: 40, textAlign: 'left', background: 'var(--bg-card)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }} className="animate-fade">
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.05em' }}>Migration Details</h3>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['Resource', 'Type', 'Source', 'Target', 'Inserted', 'Failed', 'Status'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '10px 20px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {summary.details.map((d, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</td>
+                    <td style={{ padding: '12px 20px' }}>
+                      <Badge color={d.type === 'pipeline' ? 'violet' : 'cyan'} size="sm">{d.type?.toUpperCase()}</Badge>
+                    </td>
+                    <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.sourceTable}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.targetTable}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.inserted?.toLocaleString() : '—'}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: d.failedRows > 0 ? 'var(--accent-red)' : 'var(--text-dim)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.failedRows?.toLocaleString() : '—'}</td>
+                    <td style={{ padding: '12px 20px' }}>
+                      <Badge color={d.status === 'Success' ? 'green' : d.status === 'Failed' ? 'red' : 'amber'} size="sm">{d.status}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    )}
-  </div>
-)
+      )}
+    </div>
+  )
+}
 
 // ─── Log Drawer ────────────────────────────────────────────────────────────────
 const LogDrawer = ({ logs, onClose }) => (
@@ -1155,7 +1283,7 @@ function MigrationApp({ persona }) {
             </div>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em' }}>ETL Migration Platform</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Teradata → Databricks</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Teradata → {tgtCfg?.platform === 'snowflake' ? 'Snowflake' : 'Databricks'}</div>
             </div>
           </div>
 
@@ -1210,6 +1338,8 @@ function MigrationApp({ persona }) {
             gapAnalysis={gapAnalysis}
             sourceResources={sourceResources}
             targetResources={targetResources}
+            srcCfg={srcCfg}
+            tgtCfg={tgtCfg}
             onComplete={(s) => { setReplSummary(s); setStep(4) }}
           />
         )}
@@ -1217,6 +1347,7 @@ function MigrationApp({ persona }) {
           <DoneStep
             summary={replSummary}
             logs={logs}
+            tgtCfg={tgtCfg}
             onRestart={() => { setStep(0); setLogs([]); setSourceResources(null); setTargetResources(null); setAgentStatuses({}) }}
           />
         )}
