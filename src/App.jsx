@@ -97,27 +97,35 @@ const SectionTitle = ({ children, sub }) => (
 // ─── Step indicator ───────────────────────────────────────────────────────────
 const STEPS = ['Connect', 'Discover', 'Analyze', 'Replicate', 'Done']
 
-const StepBar = ({ current }) => (
+const StepBar = ({ current, onStepClick }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 4px' }}>
     {STEPS.map((s, i) => {
       const done = i < current, active = i === current
+      const clickable = done && !!onStepClick
       return (
         <div key={s} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 'none' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+          <div
+            onClick={clickable ? () => onStepClick(i) : undefined}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, cursor: clickable ? 'pointer' : 'default' }}
+            title={clickable ? `Go back to ${s}` : undefined}
+          >
             <div style={{
               width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: done ? 'var(--accent-green)' : active ? 'var(--accent-cyan)' : 'var(--bg-surface)',
               border: `1px solid ${done ? 'var(--accent-green)' : active ? 'var(--accent-cyan)' : 'var(--border-dim)'}`,
               fontSize: 10, fontWeight: 600, color: done || active ? '#080a0e' : 'var(--text-muted)',
               boxShadow: active ? '0 0 12px rgba(56,189,248,0.4)' : done ? '0 0 8px rgba(16,185,129,0.3)' : 'none',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.2s ease',
+              ...(clickable ? { outline: 'none' } : {})
             }}>
               {done ? <Check size={12} /> : i + 1}
             </div>
             <span style={{
               fontSize: 9, fontWeight: 500, letterSpacing: '0.06em',
               color: active ? 'var(--accent-cyan)' : done ? 'var(--accent-green)' : 'var(--text-dim)',
-              textTransform: 'uppercase'
+              textTransform: 'uppercase',
+              textDecoration: clickable ? 'underline dotted' : 'none',
+              textUnderlineOffset: 3
             }}>{s}</span>
           </div>
           {i < STEPS.length - 1 && (
@@ -161,7 +169,7 @@ const Field = ({ label, value, onChange, type = 'text', placeholder = '', requir
 
 // ─── Agent Status Bar ─────────────────────────────────────────────────────────
 const AgentBar = ({ agentStatuses }) => {
-  const agents = ['connector', 'discovery', 'insight', 'replication', 'log']
+  const agents = ['connector', 'discovery', 'insight', 'replication']
   const icons = { connector: Server, discovery: Search, insight: Zap, replication: GitBranch, log: FileText }
   const colors = {
     IDLE: '#4a6080', CONNECTING_SOURCE: '#f59e0b', CONNECTING_TARGET: '#f59e0b',
@@ -1301,7 +1309,7 @@ function MigrationApp({ persona }) {
       {/* Step bar */}
       <div style={{ background: 'var(--bg-base)', borderBottom: '1px solid var(--border-dim)', padding: '14px 24px' }}>
         <div style={{ maxWidth: 700, margin: '0 auto' }}>
-          <StepBar current={step} />
+          <StepBar current={step} onStepClick={(i) => setStep(i)} />
         </div>
       </div>
 
