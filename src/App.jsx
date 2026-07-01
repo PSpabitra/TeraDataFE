@@ -1109,7 +1109,7 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
               const icon = stepIcon[evt.status]
               return (
                 <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', animation: 'fade-in 0.2s ease forwards' }}>
-                  <span style={{ color: 'var(--text-dim)', fontSize: 10, flexShrink: 0, marginTop: 1 }}>{evt.timestamp?.slice(11, 19)}</span>
+                  <span style={{ color: 'var(--text-dim)', fontSize: 10, flexShrink: 0, marginTop: 1 }}>{formatLocalTime(evt.timestamp)}</span>
                   <span style={{ color, flexShrink: 0, marginTop: 1 }}>{icon || <ChevronRight size={10} />}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ color, fontWeight: 500 }}>{evt.status}</span>
@@ -1166,7 +1166,7 @@ const DoneStep = ({ summary, logs, tgtCfg, onRestart }) => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Resource', 'Type', 'Source', 'Target', 'Inserted', 'Failed', 'Status'].map(h => (
+                  {['Table', 'Type', 'Source', 'Target', 'Inserted', 'Failed', 'Status'].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '10px 20px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                   ))}
                 </tr>
@@ -1218,7 +1218,7 @@ const LogDrawer = ({ logs, onClose }) => (
         <div key={i} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
             <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-primary)' }}>{log.event}</span>
-            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{log.timestamp?.slice(11, 19)}</span>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{formatLocalTime(log.timestamp)}</span>
           </div>
           {Object.entries(log).filter(([k]) => !['id', 'timestamp', 'event'].includes(k)).map(([k, v]) => (
             <div key={k} style={{ fontSize: 10, color: 'var(--text-muted)' }}>{k}: <span style={{ color: 'var(--text-secondary)' }}>{String(v)}</span></div>
@@ -1228,6 +1228,23 @@ const LogDrawer = ({ logs, onClose }) => (
     </div>
   </div>
 )
+
+const formatLocalTime = (timestampStr) => {
+  if (!timestampStr) return '';
+  try {
+    let dateStr = timestampStr;
+    // If it's a plain ISO string from Python without 'Z' or offset, append 'Z' to treat it as UTC
+    if (!dateStr.endsWith('Z') && !dateStr.includes('+') && dateStr.includes('T')) {
+      dateStr += 'Z';
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return timestampStr.slice(11, 19);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  } catch (e) {
+    return timestampStr.slice(11, 19);
+  }
+};
 
 // ─── Migration App ───────────────────────────────────────────────────────────────
 function MigrationApp({ persona }) {
