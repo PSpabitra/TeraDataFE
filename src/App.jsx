@@ -1,0 +1,1198 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Routes, Route, useNavigate, Navigate } from 'react-router-dom'
+import { useWebSocket } from './useWebSocket.js'
+import {
+  Database, Zap, GitBranch, Play, CheckCircle, AlertCircle,
+  Loader2, ChevronRight, Server, Cloud, Activity, BarChart2,
+  FileText, Settings, RefreshCw, Table2, Workflow, Eye,
+  Shield, ArrowRight, Circle, Check, X, Info, Clock,
+  Terminal, Layers, Search, Filter, TrendingUp, AlertTriangle
+} from 'lucide-react'
+
+const CLIENT_ID = `ui-${Math.random().toString(36).slice(2, 9)}`
+const API = 'http://localhost:3007'
+
+// ─── Tiny primitives ──────────────────────────────────────────────────────────
+const Badge = ({ children, color = 'cyan', size = 'sm' }) => {
+  const colors = {
+    cyan: 'background:rgba(56,189,248,0.1);color:#38bdf8;border-color:rgba(56,189,248,0.25)',
+    green: 'background:rgba(16,185,129,0.1);color:#10b981;border-color:rgba(16,185,129,0.25)',
+    amber: 'background:rgba(245,158,11,0.1);color:#f59e0b;border-color:rgba(245,158,11,0.25)',
+    red: 'background:rgba(239,68,68,0.1);color:#ef4444;border-color:rgba(239,68,68,0.25)',
+    violet: 'background:rgba(139,92,246,0.1);color:#8b5cf6;border-color:rgba(139,92,246,0.25)',
+    gray: 'background:rgba(100,116,139,0.12);color:#8ba3c7;border-color:rgba(100,116,139,0.2)',
+  }
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: size === 'sm' ? '2px 7px' : '3px 10px',
+      borderRadius: 20, border: '1px solid', fontSize: size === 'sm' ? 10 : 11,
+      fontWeight: 500, letterSpacing: '0.04em',
+      ...(Object.fromEntries(colors[color].split(';').map(s => s.split(':').map(x => x.trim())).filter(a => a.length === 2)))
+    }}>{children}</span>
+  )
+}
+
+const Spinner = ({ size = 14 }) => <Loader2 size={size} className="spin" />
+
+const StatusDot = ({ status }) => {
+  const cfg = {
+    connected: { color: '#10b981', label: 'Connected' },
+    connecting: { color: '#f59e0b', label: 'Connecting' },
+    disconnected: { color: '#4a6080', label: 'Disconnected' },
+    error: { color: '#ef4444', label: 'Error' },
+  }[status] || { color: '#4a6080', label: status }
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <span style={{
+        width: 7, height: 7, borderRadius: '50%', background: cfg.color,
+        boxShadow: status === 'connected' ? `0 0 6px ${cfg.color}` : 'none',
+        animation: status === 'connecting' ? 'pulse-dot 1.2s ease infinite' : 'none'
+      }} />
+      <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{cfg.label}</span>
+    </span>
+  )
+}
+
+const Btn = ({ children, onClick, variant = 'primary', disabled = false, size = 'md', icon }) => {
+  const base = {
+    display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid',
+    borderRadius: 'var(--radius)', cursor: disabled ? 'not-allowed' : 'pointer',
+    fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.03em',
+    transition: 'all 0.15s ease', opacity: disabled ? 0.45 : 1,
+    padding: size === 'sm' ? '5px 12px' : size === 'lg' ? '10px 22px' : '7px 16px',
+    fontSize: size === 'sm' ? 11 : size === 'lg' ? 13 : 12,
+  }
+  const variants = {
+    primary: { background: 'var(--accent-cyan)', color: '#080a0e', borderColor: 'var(--accent-cyan)' },
+    ghost: { background: 'transparent', color: 'var(--text-secondary)', borderColor: 'var(--border-mid)' },
+    danger: { background: 'var(--red-dim)', color: 'var(--accent-red)', borderColor: 'rgba(239,68,68,0.3)' },
+    success: { background: 'var(--green-dim)', color: 'var(--accent-green)', borderColor: 'rgba(16,185,129,0.3)' },
+    violet: { background: 'var(--violet-dim)', color: 'var(--accent-violet)', borderColor: 'rgba(139,92,246,0.3)' },
+  }
+  return (
+    <button onClick={!disabled ? onClick : undefined} style={{ ...base, ...variants[variant] }}>
+      {icon && icon}{children}
+    </button>
+  )
+}
+
+const Card = ({ children, style, glow }) => (
+  <div style={{
+    background: 'var(--bg-card)', border: '1px solid',
+    borderColor: glow ? 'var(--border-glow)' : 'var(--border-dim)',
+    borderRadius: 'var(--radius-lg)', padding: '18px 20px',
+    boxShadow: glow ? 'var(--shadow-glow)' : 'var(--shadow-card)',
+    ...style
+  }}>{children}</div>
+)
+
+const SectionTitle = ({ children, sub }) => (
+  <div style={{ marginBottom: 16 }}>
+    <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{children}</h3>
+    {sub && <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>{sub}</p>}
+  </div>
+)
+
+// ─── Step indicator ───────────────────────────────────────────────────────────
+const STEPS = ['Connect', 'Discover', 'Analyze', 'Replicate', 'Done']
+
+const StepBar = ({ current }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 4px' }}>
+    {STEPS.map((s, i) => {
+      const done = i < current, active = i === current
+      return (
+        <div key={s} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 'none' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: done ? 'var(--accent-green)' : active ? 'var(--accent-cyan)' : 'var(--bg-surface)',
+              border: `1px solid ${done ? 'var(--accent-green)' : active ? 'var(--accent-cyan)' : 'var(--border-dim)'}`,
+              fontSize: 10, fontWeight: 600, color: done || active ? '#080a0e' : 'var(--text-muted)',
+              boxShadow: active ? '0 0 12px rgba(56,189,248,0.4)' : done ? '0 0 8px rgba(16,185,129,0.3)' : 'none',
+              transition: 'all 0.3s ease'
+            }}>
+              {done ? <Check size={12} /> : i + 1}
+            </div>
+            <span style={{
+              fontSize: 9, fontWeight: 500, letterSpacing: '0.06em',
+              color: active ? 'var(--accent-cyan)' : done ? 'var(--accent-green)' : 'var(--text-dim)',
+              textTransform: 'uppercase'
+            }}>{s}</span>
+          </div>
+          {i < STEPS.length - 1 && (
+            <div style={{
+              flex: 1, height: 1, margin: '0 8px', marginBottom: 18,
+              background: i < current ? 'var(--accent-green)' : 'var(--border-dim)',
+              transition: 'background 0.3s ease'
+            }} />
+          )}
+        </div>
+      )
+    })}
+  </div>
+)
+
+// ─── Field ────────────────────────────────────────────────────────────────────
+const Field = ({ label, value, onChange, type = 'text', placeholder = '', required, password }) => (
+  <div style={{ marginBottom: 12 }}>
+    <label style={{
+      display: 'block', fontSize: 10, fontWeight: 500, color: 'var(--text-secondary)',
+      textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5
+    }}>
+      {label}{required && <span style={{ color: 'var(--accent-red)', marginLeft: 3 }}>*</span>}
+    </label>
+    <input
+      type={password ? 'password' : type}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      style={{
+        width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)',
+        borderRadius: 'var(--radius)', padding: '7px 11px', color: 'var(--text-primary)',
+        fontSize: 12, outline: 'none', transition: 'border-color 0.15s',
+        fontFamily: 'var(--font-mono)'
+      }}
+      onFocus={e => e.target.style.borderColor = 'var(--border-glow)'}
+      onBlur={e => e.target.style.borderColor = 'var(--border-dim)'}
+    />
+  </div>
+)
+
+// ─── Agent Status Bar ─────────────────────────────────────────────────────────
+const AgentBar = ({ agentStatuses }) => {
+  const agents = ['connector', 'discovery', 'insight', 'replication', 'log']
+  const icons = { connector: Server, discovery: Search, insight: Zap, replication: GitBranch, log: FileText }
+  const colors = {
+    IDLE: '#4a6080', CONNECTING_SOURCE: '#f59e0b', CONNECTING_TARGET: '#f59e0b',
+    SCANNING_SOURCE: '#38bdf8', SCANNING_TARGET: '#38bdf8',
+    ANALYZING_SOURCE: '#8b5cf6', ANALYZING_TARGET: '#8b5cf6',
+    REPLICATION_STARTED: '#f97316', REPLICATION_RUNNING: '#f97316', COMPLETE: '#10b981',
+    ERROR: '#ef4444'
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {agents.map(a => {
+        const status = agentStatuses[a] || 'IDLE'
+        const Icon = icons[a]
+        const color = colors[status] || '#4a6080'
+        const active = status !== 'IDLE'
+        return (
+          <div key={a} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '4px 10px', borderRadius: 20,
+            background: active ? `rgba(${color.replace('#', '').match(/.{2}/g).map(h => parseInt(h, 16)).join(',')},0.1)` : 'var(--bg-surface)',
+            border: `1px solid ${active ? color + '44' : 'var(--border-dim)'}`,
+            transition: 'all 0.3s ease'
+          }}>
+            <Icon size={11} style={{ color, animation: active ? 'spin 1.5s linear infinite' : 'none' }} />
+            <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: active ? color : 'var(--text-dim)' }}>
+              {a}
+            </span>
+            {active && status !== 'IDLE' && (
+              <span style={{ fontSize: 9, color: 'var(--text-muted)', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {status.replace(/_/g, ' ')}
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Login Page ────────────────────────────────────────────────────────────
+const LoginPage = ({ onLogin }) => {
+  const [username, setUsername] = useState('admin')
+  const [password, setPassword] = useState('admin')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setError(''); setLoading(true)
+    try {
+      const res = await fetch(`${API}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      if (!res.ok) throw new Error('Invalid credentials')
+      const data = await res.json()
+      onLogin(data)
+      navigate('/')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 400, margin: '0 auto' }} className="animate-fade">
+        <Card glow>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: 12, margin: '0 auto 16px',
+              background: 'linear-gradient(135deg, #38bdf8, #8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Shield size={24} style={{ color: '#fff' }} />
+            </div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700 }}>Welcome Back</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Log in to access your connections</p>
+          </div>
+          <form onSubmit={handleLogin}>
+            <Field label="Username" value={username} onChange={setUsername} placeholder="admin" required />
+            <Field label="Password" value={password} onChange={setPassword} password required />
+            {error && (
+              <div style={{ padding: '8px 12px', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 11, color: 'var(--accent-red)' }}>
+                <AlertCircle size={12} style={{ display: 'inline', marginRight: 6 }} />{error}
+              </div>
+            )}
+            <Btn variant="primary" disabled={loading || !username || !password} style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}>
+              {loading ? <Spinner size={14} /> : 'Sign In'}
+            </Btn>
+          </form>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+// ─── Landing Page ─────────────────────────────────────────────────────────────
+const LandingPage = ({ persona }) => {
+  const navigate = useNavigate()
+  if (!persona) return <Navigate to="/login" replace />
+  
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ maxWidth: 600, textAlign: 'center' }} className="animate-fade">
+        <div style={{
+          width: 64, height: 64, borderRadius: 16, margin: '0 auto 24px',
+          background: 'linear-gradient(135deg, #38bdf8, #8b5cf6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <GitBranch size={32} style={{ color: '#fff' }} />
+        </div>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, marginBottom: 12 }}>
+          ETL Migration Platform
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 32 }}>
+          Welcome back, <strong style={{ color: 'var(--text-primary)' }}>{persona.username}</strong>. Ready to migrate some data?
+        </p>
+        <Btn variant="primary" size="lg" icon={<Play size={16} />} onClick={() => navigate('/migration')}>
+          Start New Migration
+        </Btn>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 1: Connect ──────────────────────────────────────────────────────────
+const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
+  const [src, setSrc] = useState({ platform: 'teradata', host: '', username: '', password: '', database: '', port: '1025' })
+  const [tgt, setTgt] = useState({ platform: 'databricks', host: '', token: '', cluster_id: '', warehouse_id: '' })
+  const [srcResult, setSrcResult] = useState(null)
+  const [tgtResult, setTgtResult] = useState(null)
+  const [srcLoading, setSrcLoading] = useState(false)
+  const [tgtLoading, setTgtLoading] = useState(false)
+
+  const srcRef = useRef(src)
+  const tgtRef = useRef(tgt)
+  useEffect(() => { srcRef.current = src; tgtRef.current = tgt }, [src, tgt])
+
+  useEffect(() => {
+    if (persona?.id) {
+      fetch(`${API}/api/v1/connections/?persona_id=${persona.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.credentials) {
+            data.credentials.forEach(c => {
+              if (c.platform === 'teradata') setSrc({ ...src, host: c.host || '', username: c.username || '', password: c.password || '', database: c.database_name || '', port: c.port || '1025' })
+              if (c.platform === 'databricks') setTgt({ ...tgt, host: c.host || '', token: c.token || '', cluster_id: c.cluster_id || '', warehouse_id: c.warehouse_id || '' })
+            })
+          }
+        }).catch(console.error)
+    }
+  }, [persona?.id])
+
+  const handleMsg = useCallback((msg) => {
+    if (msg.type === 'connection_result') {
+      if (msg.connection_type === 'source') { 
+        setSrcResult(msg.result); setSrcLoading(false)
+        if (msg.result.status === 'connected' && persona?.id) {
+          fetch(`${API}/api/v1/connections/save?persona_id=${persona.id}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...srcRef.current, port: parseInt(srcRef.current.port) || 1025 })
+          }).catch(console.error)
+        }
+      }
+      if (msg.connection_type === 'target') { 
+        setTgtResult(msg.result); setTgtLoading(false)
+        if (msg.result.status === 'connected' && persona?.id) {
+          fetch(`${API}/api/v1/connections/save?persona_id=${persona.id}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tgtRef.current)
+          }).catch(console.error)
+        }
+      }
+    }
+  }, [persona?.id])
+
+  // Expose handler to parent
+  useEffect(() => { window.__connectHandler = handleMsg }, [handleMsg])
+
+  const connectSrc = () => {
+    setSrcLoading(true); setSrcResult(null)
+    send('connect_source', { ...src, port: parseInt(src.port) || 1025 })
+  }
+  const connectTgt = () => {
+    setTgtLoading(true); setTgtResult(null)
+    send('connect_target', { ...tgt })
+  }
+
+  const bothConnected = srcResult?.status === 'connected' && tgtResult?.status === 'connected'
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }} className="animate-fade">
+      {/* Source */}
+      <Card glow={srcResult?.status === 'connected'}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <div style={{ padding: 7, background: 'rgba(56,189,248,0.1)', borderRadius: 'var(--radius)', border: '1px solid rgba(56,189,248,0.2)' }}>
+            <Database size={16} style={{ color: 'var(--accent-cyan)' }} />
+          </div>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600 }}>Source Platform</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Teradata Data Warehouse</div>
+          </div>
+          {srcResult && <Badge color={srcResult.status === 'connected' ? 'green' : 'red'} style={{ marginLeft: 'auto' }}>
+            {srcResult.status}
+          </Badge>}
+        </div>
+        <Field label="Host" value={src.host} onChange={v => setSrc(p => ({ ...p, host: v }))} placeholder="teradata-host.company.com" required />
+        <Field label="Username" value={src.username} onChange={v => setSrc(p => ({ ...p, username: v }))} placeholder="dbc" required />
+        <Field label="Password" value={src.password} onChange={v => setSrc(p => ({ ...p, password: v }))} password required />
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+          <Field label="Database" value={src.database} onChange={v => setSrc(p => ({ ...p, database: v }))} placeholder="PROD_DW" />
+          <Field label="Port" value={src.port} onChange={v => setSrc(p => ({ ...p, port: v }))} placeholder="1025" />
+        </div>
+        {srcResult?.status === 'failed' && (
+          <div style={{ padding: '8px 12px', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius)', marginBottom: 12, fontSize: 11, color: 'var(--accent-red)' }}>
+            <AlertCircle size={12} style={{ display: 'inline', marginRight: 6 }} />{srcResult.error}
+          </div>
+        )}
+        {srcResult?.status === 'connected' && (
+          <div style={{ padding: '10px 12px', background: 'var(--green-dim)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 'var(--radius)', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--accent-green)', fontWeight: 500, marginBottom: 6 }}>
+              <Check size={12} style={{ display: 'inline', marginRight: 5 }} />Connected successfully
+            </div>
+            {srcResult.metadata && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                {Object.entries(srcResult.metadata).filter(([k]) => k !== 'database').map(([k, v]) => (
+                  <div key={k} style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>{k}: </span>{String(v)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <Btn onClick={connectSrc} disabled={srcLoading || !src.host || !src.username || wsStatus !== 'connected'}
+          variant={srcResult?.status === 'connected' ? 'success' : 'primary'} size="sm"
+          icon={srcLoading ? <Spinner size={11} /> : <Server size={11} />}>
+          {srcLoading ? 'Connecting...' : srcResult?.status === 'connected' ? 'Reconnect' : 'Connect Teradata'}
+        </Btn>
+      </Card>
+
+      {/* Target */}
+      <Card glow={tgtResult?.status === 'connected'}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <div style={{ padding: 7, background: 'rgba(139,92,246,0.1)', borderRadius: 'var(--radius)', border: '1px solid rgba(139,92,246,0.2)' }}>
+            <Cloud size={16} style={{ color: 'var(--accent-violet)' }} />
+          </div>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600 }}>Target Platform</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Databricks Lakehouse</div>
+          </div>
+          {tgtResult && <Badge color={tgtResult.status === 'connected' ? 'green' : 'red'}>{tgtResult.status}</Badge>}
+        </div>
+        <Field label="Workspace URL" value={tgt.host} onChange={v => setTgt(p => ({ ...p, host: v }))} placeholder="https://adb-xxx.azuredatabricks.net" required />
+        <Field label="Access Token" value={tgt.token} onChange={v => setTgt(p => ({ ...p, token: v }))} password placeholder="dapi..." required />
+        <Field label="Cluster ID" value={tgt.cluster_id} onChange={v => setTgt(p => ({ ...p, cluster_id: v }))} placeholder="0101-123456-abc" />
+        <Field label="SQL Warehouse ID" value={tgt.warehouse_id} onChange={v => setTgt(p => ({ ...p, warehouse_id: v }))} placeholder="abc123def" />
+        {tgtResult?.status === 'failed' && (
+          <div style={{ padding: '8px 12px', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius)', marginBottom: 12, fontSize: 11, color: 'var(--accent-red)' }}>
+            <AlertCircle size={12} style={{ display: 'inline', marginRight: 6 }} />{tgtResult.error}
+          </div>
+        )}
+        {tgtResult?.status === 'connected' && (
+          <div style={{ padding: '10px 12px', background: 'var(--green-dim)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 'var(--radius)', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--accent-green)', fontWeight: 500, marginBottom: 6 }}>
+              <Check size={12} style={{ display: 'inline', marginRight: 5 }} />Connected as {tgtResult.user}
+            </div>
+            {tgtResult.metadata && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                {Object.entries(tgtResult.metadata).map(([k, v]) => (
+                  <div key={k} style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>{k}: </span>
+                    {Array.isArray(v) ? v.slice(0, 2).join(', ') : String(v)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <Btn onClick={connectTgt} disabled={tgtLoading || !tgt.host || !tgt.token || wsStatus !== 'connected'}
+          variant={tgtResult?.status === 'connected' ? 'success' : 'violet'} size="sm"
+          icon={tgtLoading ? <Spinner size={11} /> : <Cloud size={11} />}>
+          {tgtLoading ? 'Connecting...' : tgtResult?.status === 'connected' ? 'Reconnect' : 'Connect Databricks'}
+        </Btn>
+      </Card>
+
+      {bothConnected && (
+        <div style={{ gridColumn: '1/-1', display: 'flex', justifyContent: 'center', paddingTop: 4 }} className="animate-fade">
+          <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
+            Both platforms connected — Proceed to Discovery
+          </Btn>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Step 2: Discover ─────────────────────────────────────────────────────────
+const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tgtCfg }) => {
+  const [srcResources, setSrcResources] = useState(null)
+  const [tgtResources, setTgtResources] = useState(null)
+  const [srcInsights, setSrcInsights] = useState(null)
+  const [tgtInsights, setTgtInsights] = useState(null)
+  const [scanning, setScanning] = useState(false)
+  const [activeTab, setActiveTab] = useState('source')
+
+  useEffect(() => {
+    window.__discoveryHandler = (msg) => {
+      if (msg.type === 'discovery_result') {
+        if (msg.environment === 'source') { setSrcResources(msg.resources); setSrcInsights(msg.insights) }
+        if (msg.environment === 'target') { setTgtResources(msg.resources); setTgtInsights(msg.insights); setScanning(false) }
+      }
+    }
+  }, [])
+
+  const startScan = () => {
+    setScanning(true); setSrcResources(null); setTgtResources(null)
+    send('discover_source', { platform: 'teradata', ...srcCfg })
+    setTimeout(() => send('discover_target', { platform: 'databricks', ...tgtCfg }), 800)
+  }
+
+  const StatPill = ({ label, value, color = 'cyan' }) => (
+    <div style={{ textAlign: 'center', padding: '8px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)' }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: `var(--accent-${color})`, fontFamily: 'var(--font-display)' }}>{value}</div>
+      <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 2 }}>{label}</div>
+    </div>
+  )
+
+  const ResourceTable = ({ resources }) => {
+    if (!resources) return null
+    const datasets = resources.datasets || []
+    const pipelines = resources.pipelines || []
+    return (
+      <div>
+        {datasets.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Table2 size={11} /> Datasets ({datasets.length})
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>{['Name', 'Type', 'Schema', 'Rows', 'Size'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, fontWeight: 500, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)' }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {datasets.map(d => (
+                  <tr key={d.id} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</td>
+                    <td style={{ padding: '6px 8px' }}><Badge color={d.type === 'VIEW' ? 'violet' : 'cyan'} size="sm">{d.type}</Badge></td>
+                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{d.schema || d.catalog || '—'}</td>
+                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{d.row_count?.toLocaleString() || '—'}</td>
+                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{d.size_mb ? `${d.size_mb}MB` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {pipelines.length > 0 && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Workflow size={11} /> Pipelines ({pipelines.length})
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>{['Name', 'Type', 'Schedule', 'Status'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, fontWeight: 500, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)' }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {pipelines.map(p => (
+                  <tr key={p.id} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-primary)', fontWeight: 500 }}>{p.name}</td>
+                    <td style={{ padding: '6px 8px', fontSize: 10, color: 'var(--text-secondary)' }}>{p.type}</td>
+                    <td style={{ padding: '6px 8px', fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{p.schedule || '—'}</td>
+                    <td style={{ padding: '6px 8px' }}><Badge color={p.status === 'ACTIVE' || p.status === 'RUNNING' ? 'green' : 'gray'}>{p.status || '—'}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const InsightPanel = ({ insights }) => {
+    if (!insights) return null
+    return (
+      <div style={{ marginTop: 14, padding: '12px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, color: 'var(--accent-violet)', fontWeight: 500 }}>
+          <Zap size={12} /> AI Analysis
+        </div>
+        <p style={{ marginBottom: 8 }}>{insights.narrative}</p>
+        {insights.report?.datasets?.quality_flags?.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            {insights.report.datasets.quality_flags.map((f, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                {f.flag === 'CONTAINS_PII' ? <Shield size={11} style={{ color: 'var(--accent-red)' }} /> : <Info size={11} style={{ color: 'var(--accent-amber)' }} />}
+                <span style={{ color: f.flag === 'CONTAINS_PII' ? 'var(--accent-red)' : 'var(--accent-amber)', fontWeight: 500 }}>{f.dataset}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{f.flag}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const bothDone = srcResources && tgtResources
+  return (
+    <div className="animate-fade">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700 }}>Environment Discovery</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>Scan both platforms, catalog all resources, generate AI insights</div>
+        </div>
+        <Btn onClick={startScan} disabled={scanning} variant="primary"
+          icon={scanning ? <Spinner size={11} /> : <RefreshCw size={11} />}>
+          {scanning ? 'Scanning...' : srcResources ? 'Re-scan' : 'Start Discovery'}
+        </Btn>
+      </div>
+
+      {(srcResources || tgtResources) && (
+        <div>
+          {/* Tab bar */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            {['source', 'target'].map(t => (
+              <button key={t} onClick={() => setActiveTab(t)} style={{
+                padding: '6px 16px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
+                background: activeTab === t ? 'var(--bg-active)' : 'transparent',
+                borderColor: activeTab === t ? 'var(--border-bright)' : 'var(--border-dim)',
+                color: activeTab === t ? 'var(--text-primary)' : 'var(--text-secondary)',
+                fontFamily: 'var(--font-mono)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6
+              }}>
+                {t === 'source' ? <Database size={11} /> : <Cloud size={11} />}
+                {t === 'source' ? 'Teradata Source' : 'Databricks Target'}
+                {t === 'source' && srcResources && <Badge color="green" size="sm">✓</Badge>}
+                {t === 'target' && tgtResources && <Badge color="green" size="sm">✓</Badge>}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'source' && srcResources && (
+            <Card className="animate-fade">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 16 }}>
+                <StatPill label="Datasets" value={srcResources.summary?.total_datasets || 0} color="cyan" />
+                <StatPill label="Pipelines" value={srcResources.summary?.total_pipelines || 0} color="violet" />
+                <StatPill label="Views" value={srcResources.summary?.total_views || 0} color="amber" />
+                <StatPill label="Size GB" value={srcResources.summary?.total_size_gb || 0} color="green" />
+                <StatPill label="Total Rows" value={((srcResources.datasets || []).reduce((s, d) => s + (d.row_count || 0), 0) / 1e6).toFixed(1) + 'M'} color="cyan" />
+              </div>
+              <ResourceTable resources={srcResources} />
+              <InsightPanel insights={srcInsights} />
+            </Card>
+          )}
+          {activeTab === 'target' && tgtResources && (
+            <Card className="animate-fade">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
+                <StatPill label="Datasets" value={tgtResources.summary?.total_datasets || 0} color="violet" />
+                <StatPill label="Pipelines" value={tgtResources.summary?.total_pipelines || 0} color="violet" />
+                <StatPill label="Size GB" value={tgtResources.summary?.total_size_gb || 0} color="green" />
+                <StatPill label="Notebooks" value={tgtResources.summary?.total_notebooks || 0} color="amber" />
+              </div>
+              <ResourceTable resources={tgtResources} />
+              <InsightPanel insights={tgtInsights} />
+            </Card>
+          )}
+        </div>
+      )}
+
+      {bothDone && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 18 }}>
+          <Btn onClick={() => onComplete(srcResources, tgtResources)} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
+            Proceed to Resource Selection
+          </Btn>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Step 3: Analyze ──────────────────────────────────────────────────────────
+const AnalyzeStep = ({ send, sourceResources, targetResources, onComplete }) => {
+  const [selected, setSelected] = useState([])
+  const [gapAnalysis, setGapAnalysis] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+
+  useEffect(() => {
+    window.__insightHandler = (msg) => {
+      if (msg.type === 'migration_insights') {
+        setGapAnalysis(msg.result)
+        setAnalyzing(false)
+      }
+    }
+  }, [])
+
+  const allItems = [
+    ...(sourceResources?.datasets || []).map(d => ({ ...d, kind: 'dataset' })),
+    ...(sourceResources?.pipelines || []).map(p => ({ ...p, kind: 'pipeline' }))
+  ]
+
+  const toggle = (item) => {
+    setSelected(prev => prev.find(s => s.id === item.id)
+      ? prev.filter(s => s.id !== item.id)
+      : [...prev, item])
+  }
+
+  const analyze = () => {
+    if (!selected.length) return
+    setAnalyzing(true); setGapAnalysis(null)
+    send('get_insights', {
+      source_resources: sourceResources,
+      target_resources: targetResources,
+      selected_resources: selected.map(s => ({ name: s.name, type: s.kind === 'pipeline' ? 'pipeline' : 'dataset' }))
+    })
+  }
+
+  const riskColor = { LOW: 'green', MEDIUM: 'amber', HIGH: 'red' }
+
+  return (
+    <div className="animate-fade">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {/* Selector */}
+        <div>
+          <SectionTitle
+            children="Select Resources to Migrate"
+            sub={`${selected.length} of ${allItems.length} selected`}
+          />
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <Btn size="sm" variant="ghost" onClick={() => setSelected(allItems)}>Select all</Btn>
+            <Btn size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Btn>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 380, overflowY: 'auto' }}>
+            {allItems.map(item => {
+              const sel = !!selected.find(s => s.id === item.id)
+              const isPII = item.tags?.includes('PII')
+              return (
+                <div key={item.id} onClick={() => toggle(item)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                  borderRadius: 'var(--radius)', border: '1px solid', cursor: 'pointer',
+                  borderColor: sel ? 'var(--accent-cyan)' : 'var(--border-dim)',
+                  background: sel ? 'var(--cyan-dim)' : 'var(--bg-surface)',
+                  transition: 'all 0.15s'
+                }}>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: 4, border: '1px solid', flexShrink: 0,
+                    borderColor: sel ? 'var(--accent-cyan)' : 'var(--border-mid)',
+                    background: sel ? 'var(--accent-cyan)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    {sel && <Check size={10} style={{ color: '#080a0e' }} />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {item.kind === 'pipeline' ? <Workflow size={11} style={{ color: 'var(--accent-violet)' }} /> : <Table2 size={11} style={{ color: 'var(--accent-cyan)' }} />}
+                      {item.name}
+                      {isPII && <Shield size={10} style={{ color: 'var(--accent-red)' }} />}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
+                      {item.schema || item.type} {item.row_count ? `· ${item.row_count.toLocaleString()} rows` : ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {(item.tags || []).slice(0, 2).map(t => <Badge key={t} color="gray" size="sm">{t}</Badge>)}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Btn onClick={analyze} disabled={!selected.length || analyzing} variant="primary"
+              icon={analyzing ? <Spinner size={11} /> : <BarChart2 size={11} />}>
+              {analyzing ? 'Analyzing...' : 'Run Gap Analysis'}
+            </Btn>
+          </div>
+        </div>
+
+        {/* Gap Analysis Results */}
+        <div>
+          <SectionTitle children="Migration Gap Analysis" sub="AI-powered readiness assessment" />
+          {!gapAnalysis && !analyzing && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text-muted)', gap: 10 }}>
+              <BarChart2 size={28} style={{ opacity: 0.3 }} />
+              <span style={{ fontSize: 12 }}>Select resources and run analysis</span>
+            </div>
+          )}
+          {analyzing && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 300, gap: 12 }}>
+              <Spinner size={24} />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Running AI gap analysis via Mistral...</span>
+            </div>
+          )}
+          {gapAnalysis && (
+            <div className="animate-fade">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 14 }}>
+                {[
+                  ['New Creates', gapAnalysis.gap_analysis?.new_creates || 0, 'cyan'],
+                  ['Incremental', gapAnalysis.gap_analysis?.incremental_updates || 0, 'green'],
+                  ['High Risk', gapAnalysis.gap_analysis?.high_risk_items || 0, 'red'],
+                  ['Total MB', Math.round(gapAnalysis.gap_analysis?.total_size_mb || 0), 'amber'],
+                ].map(([l, v, c]) => (
+                  <div key={l} style={{ padding: '10px 12px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)' }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: `var(--accent-${c})`, fontFamily: 'var(--font-display)' }}>{v}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{l}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Item rows */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
+                {(gapAnalysis.gap_analysis?.items || []).map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-primary)' }}>{item.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.replication_mode?.replace(/_/g, ' ')}</div>
+                    </div>
+                    <Badge color={item.exists_in_target ? 'green' : 'cyan'}>{item.exists_in_target ? 'UPDATE' : 'CREATE'}</Badge>
+                    <Badge color={riskColor[item.risk] || 'gray'}>{item.risk}</Badge>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.estimated_duration_min}m</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Recommendations */}
+              {(gapAnalysis.recommendations || []).length > 0 && (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {gapAnalysis.recommendations.map((r, i) => (
+                    <div key={i} style={{
+                      padding: '7px 10px', borderRadius: 'var(--radius)',
+                      border: '1px solid', display: 'flex', gap: 8, alignItems: 'flex-start',
+                      borderColor: r.type === 'WARNING' ? 'rgba(239,68,68,0.2)' : r.type === 'SUCCESS' ? 'rgba(16,185,129,0.2)' : 'rgba(56,189,248,0.2)',
+                      background: r.type === 'WARNING' ? 'var(--red-dim)' : r.type === 'SUCCESS' ? 'var(--green-dim)' : 'var(--cyan-dim)',
+                    }}>
+                      {r.type === 'WARNING' ? <AlertTriangle size={11} style={{ color: 'var(--accent-red)', flexShrink: 0, marginTop: 1 }} />
+                        : r.type === 'SUCCESS' ? <CheckCircle size={11} style={{ color: 'var(--accent-green)', flexShrink: 0, marginTop: 1 }} />
+                          : <Info size={11} style={{ color: 'var(--accent-cyan)', flexShrink: 0, marginTop: 1 }} />}
+                      <span style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{r.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ marginTop: 14 }}>
+                <Btn onClick={() => onComplete(selected, gapAnalysis)} variant="primary" size="lg" icon={<ChevronRight size={14} />}>
+                  Start Replication
+                </Btn>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 4: Replicate ────────────────────────────────────────────────────────
+const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetResources, onComplete }) => {
+  const [events, setEvents] = useState([])
+  const [started, setStarted] = useState(false)
+  const [done, setDone] = useState(false)
+  const [summary, setSummary] = useState(null)
+  const logRef = useRef(null)
+
+  useEffect(() => {
+    window.__replicationHandler = (msg) => {
+      if (msg.type === 'replication_progress') {
+        const p = msg.progress
+        setEvents(prev => [...prev, p])
+        if (p.status === 'COMPLETED') { setDone(true); setSummary(p) }
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
+  }, [events])
+
+  const startReplication = () => {
+    setStarted(true); setEvents([]); setDone(false)
+    send('start_replication', {
+      selected_resources: selected.map(s => ({
+        id: s.id, name: s.name, type: s.kind || 'dataset',
+        columns: s.columns || [], row_count: s.row_count || 0, tags: s.tags || []
+      })),
+      source_platform: 'teradata',
+      target_platform: 'databricks',
+      gap_analysis: gapAnalysis?.gap_analysis || {}
+    })
+  }
+
+  const stepColor = {
+    STARTED: '#38bdf8', ITEM_STARTED: '#8b5cf6', ITEM_COMPLETED: '#10b981',
+    ITEM_FAILED: '#ef4444', COMPLETED: '#10b981', STEP: '#8ba3c7',
+    BATCH_LOADED: '#38bdf8', DATASET_SUCCESS: '#10b981', PIPELINE_SUCCESS: '#10b981'
+  }
+  const stepIcon = {
+    ITEM_COMPLETED: <Check size={11} />, ITEM_FAILED: <X size={11} />,
+    COMPLETED: <CheckCircle size={11} />, BATCH_LOADED: <Activity size={11} />
+  }
+
+  return (
+    <div className="animate-fade">
+      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20 }}>
+        {/* Left: Queue */}
+        <div>
+          <SectionTitle children="Migration Queue" sub={`${selected.length} items selected`} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 420, overflowY: 'auto' }}>
+            {selected.map((item, i) => {
+              const itemEvents = events.filter(e => e.item === item.name)
+              const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED')
+              const failed = itemEvents.some(e => e.status === 'ITEM_FAILED')
+              const running = started && !finished && !failed && itemEvents.length > 0
+              const waiting = started && !finished && !failed && itemEvents.length === 0 && !done
+
+              const batchEvt = itemEvents.filter(e => e.status === 'BATCH_LOADED').slice(-1)[0]
+              const pct = batchEvt?.progress_pct
+
+              return (
+                <div key={item.id} style={{
+                  padding: '8px 12px', borderRadius: 'var(--radius)',
+                  background: finished ? 'var(--green-dim)' : failed ? 'var(--red-dim)' : 'var(--bg-surface)',
+                  border: `1px solid ${finished ? 'rgba(16,185,129,0.25)' : failed ? 'rgba(239,68,68,0.25)' : 'var(--border-dim)'}`,
+                  transition: 'all 0.3s'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ color: finished ? 'var(--accent-green)' : failed ? 'var(--accent-red)' : running ? 'var(--accent-violet)' : 'var(--text-muted)' }}>
+                      {finished ? <Check size={12} /> : failed ? <X size={12} /> : running ? <Spinner size={12} /> : <Circle size={12} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>{item.kind?.toUpperCase() || 'DATASET'}</div>
+                    </div>
+                  </div>
+                  {running && pct !== undefined && (
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ background: 'var(--bg-void)', borderRadius: 2, height: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent-violet)', borderRadius: 2, transition: 'width 0.3s' }} />
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{pct}%</div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {!started && (
+            <div style={{ marginTop: 12 }}>
+              <Btn onClick={startReplication} variant="primary" size="lg" icon={<Play size={13} />}>
+                Start Migration
+              </Btn>
+            </div>
+          )}
+          {done && summary && (
+            <div style={{ marginTop: 12, padding: '12px', background: 'var(--green-dim)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 'var(--radius)' }}>
+              <div style={{ color: 'var(--accent-green)', fontWeight: 600, fontSize: 12, marginBottom: 6 }}><Check size={12} style={{ display: 'inline', marginRight: 5 }} />Migration Complete</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                {summary.completed} completed · {summary.failed} failed
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <Btn onClick={() => onComplete(summary)} variant="success" size="sm" icon={<ChevronRight size={11} />}>View Summary</Btn>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Live log */}
+        <div>
+          <SectionTitle children="Live Replication Log" sub="Real-time agent event stream" />
+          <div ref={logRef} style={{
+            height: 460, overflowY: 'auto', background: 'var(--bg-void)',
+            border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)',
+            padding: '12px', fontFamily: 'var(--font-mono)', fontSize: 11
+          }}>
+            {!started && (
+              <div style={{ color: 'var(--text-dim)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 8 }}>
+                <Terminal size={24} style={{ opacity: 0.3 }} />
+                <span>Waiting to start...</span>
+              </div>
+            )}
+            {events.map((evt, i) => {
+              const color = stepColor[evt.status] || '#8ba3c7'
+              const icon = stepIcon[evt.status]
+              return (
+                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', animation: 'fade-in 0.2s ease forwards' }}>
+                  <span style={{ color: 'var(--text-dim)', fontSize: 10, flexShrink: 0, marginTop: 1 }}>{evt.timestamp?.slice(11, 19)}</span>
+                  <span style={{ color, flexShrink: 0, marginTop: 1 }}>{icon || <ChevronRight size={10} />}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ color, fontWeight: 500 }}>{evt.status}</span>
+                    {evt.item && <span style={{ color: 'var(--text-secondary)', marginLeft: 8 }}>{evt.item}</span>}
+                    {evt.message && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>{evt.message}</span>}
+                    {evt.detail && <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 2, wordBreak: 'break-all' }}>{evt.detail.slice(0, 120)}</div>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 5: Done ─────────────────────────────────────────────────────────────
+const DoneStep = ({ summary, logs, onRestart }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '40px 0' }} className="animate-fade">
+    <div style={{
+      width: 72, height: 72, borderRadius: '50%', background: 'var(--green-dim)',
+      border: '2px solid var(--accent-green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      marginBottom: 20, boxShadow: '0 0 30px rgba(16,185,129,0.25)'
+    }}>
+      <CheckCircle size={32} style={{ color: 'var(--accent-green)' }} />
+    </div>
+    <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Migration Complete</h2>
+    <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 28 }}>All selected resources have been migrated to Databricks</p>
+    {summary && (
+      <div style={{ display: 'flex', gap: 16, marginBottom: 32 }}>
+        {[
+          ['Total Items', summary.total, 'cyan'],
+          ['Completed', summary.completed, 'green'],
+          ['Failed', summary.failed, 'red'],
+        ].map(([l, v, c]) => (
+          <div key={l} style={{ padding: '16px 28px', background: 'var(--bg-card)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: `var(--accent-${c})`, fontFamily: 'var(--font-display)' }}>{v}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4 }}>{l}</div>
+          </div>
+        ))}
+      </div>
+    )}
+    <Btn onClick={onRestart} variant="ghost" icon={<RefreshCw size={13} />}>Start New Migration</Btn>
+  </div>
+)
+
+// ─── Log Drawer ────────────────────────────────────────────────────────────────
+const LogDrawer = ({ logs, onClose }) => (
+  <div style={{
+    position: 'fixed', top: 0, right: 0, bottom: 0, width: 420,
+    background: 'var(--bg-panel)', borderLeft: '1px solid var(--border-dim)',
+    zIndex: 100, display: 'flex', flexDirection: 'column',
+    boxShadow: '-4px 0 20px rgba(0,0,0,0.5)', animation: 'slide-right 0.2s ease'
+  }}>
+    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <FileText size={14} style={{ color: 'var(--accent-cyan)' }} />Audit Logs
+      </div>
+      <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}>
+        <X size={16} />
+      </button>
+    </div>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+      {logs.length === 0 && <div style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center', marginTop: 40 }}>No logs yet</div>}
+      {[...logs].reverse().map((log, i) => (
+        <div key={i} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-primary)' }}>{log.event}</span>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{log.timestamp?.slice(11, 19)}</span>
+          </div>
+          {Object.entries(log).filter(([k]) => !['id', 'timestamp', 'event'].includes(k)).map(([k, v]) => (
+            <div key={k} style={{ fontSize: 10, color: 'var(--text-muted)' }}>{k}: <span style={{ color: 'var(--text-secondary)' }}>{String(v)}</span></div>
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+)
+
+// ─── Migration App ───────────────────────────────────────────────────────────────
+function MigrationApp({ persona }) {
+  const [step, setStep] = useState(0)
+  const [agentStatuses, setAgentStatuses] = useState({})
+  const [sourceResources, setSourceResources] = useState(null)
+  const [targetResources, setTargetResources] = useState(null)
+  const [selectedResources, setSelectedResources] = useState([])
+  const [gapAnalysis, setGapAnalysis] = useState(null)
+  const [replSummary, setReplSummary] = useState(null)
+  const [logs, setLogs] = useState([])
+  const [showLogs, setShowLogs] = useState(false)
+  const [srcCfg, setSrcCfg] = useState({})
+  const [tgtCfg, setTgtCfg] = useState({})
+
+  // Route all incoming WS messages
+  const handleMessage = useCallback((msg) => {
+    // Agent status
+    if (msg.type === 'agent_status') {
+      setAgentStatuses(prev => ({ ...prev, [msg.agent]: msg.status }))
+      return
+    }
+    // Route to current step handlers
+    window.__connectHandler?.(msg)
+    window.__discoveryHandler?.(msg)
+    window.__insightHandler?.(msg)
+    window.__replicationHandler?.(msg)
+    // Audit log
+    if (msg.type === 'agent_error') {
+      setLogs(prev => [...prev, { event: 'AGENT_ERROR', ...msg, timestamp: new Date().toISOString() }])
+    }
+  }, [])
+
+  const { send, status: wsStatus } = useWebSocket(CLIENT_ID, handleMessage)
+
+  // Intercept send to capture configs
+  const wrappedSend = useCallback((action, payload) => {
+    if (action === 'connect_source') setSrcCfg(payload)
+    if (action === 'connect_target') setTgtCfg(payload)
+    // Log every action
+    setLogs(prev => [...prev, { event: `WS_SEND:${action}`, timestamp: new Date().toISOString(), ...Object.fromEntries(Object.entries(payload).filter(([k]) => !['password', 'token'].includes(k))) }])
+    return send(action, payload)
+  }, [send])
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <header style={{
+        borderBottom: '1px solid var(--border-dim)',
+        background: 'rgba(13,17,23,0.85)', backdropFilter: 'blur(12px)',
+        position: 'sticky', top: 0, zIndex: 50
+      }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: 8,
+              background: 'linear-gradient(135deg, #38bdf8, #8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <GitBranch size={15} style={{ color: '#fff' }} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em' }}>ETL Migration Platform</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Teradata → Databricks</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <AgentBar agentStatuses={agentStatuses} />
+            <div style={{ width: 1, height: 24, background: 'var(--border-dim)' }} />
+            <StatusDot status={wsStatus} />
+            <Btn size="sm" variant="ghost" onClick={() => setShowLogs(v => !v)} icon={<FileText size={11} />}>
+              Logs {logs.length > 0 && <Badge color="amber" size="sm">{logs.length}</Badge>}
+            </Btn>
+          </div>
+        </div>
+      </header>
+
+      {/* Step bar */}
+      <div style={{ background: 'var(--bg-base)', borderBottom: '1px solid var(--border-dim)', padding: '14px 24px' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto' }}>
+          <StepBar current={step} />
+        </div>
+      </div>
+
+      {/* Main content */}
+      <main style={{ flex: 1, maxWidth: 1280, margin: '0 auto', padding: '28px 24px', width: '100%' }}>
+        {step === 0 && (
+          <ConnectStep
+            send={wrappedSend}
+            wsStatus={wsStatus}
+            onComplete={() => setStep(1)}
+            persona={persona}
+          />
+        )}
+        {step === 1 && (
+          <DiscoverStep
+            send={wrappedSend}
+            srcCfg={srcCfg}
+            tgtCfg={tgtCfg}
+            onComplete={(src, tgt) => { setSourceResources(src); setTargetResources(tgt); setStep(2) }}
+          />
+        )}
+        {step === 2 && (
+          <AnalyzeStep
+            send={wrappedSend}
+            sourceResources={sourceResources}
+            targetResources={targetResources}
+            onComplete={(sel, gap) => { setSelectedResources(sel); setGapAnalysis(gap); setStep(3) }}
+          />
+        )}
+        {step === 3 && (
+          <ReplicateStep
+            send={wrappedSend}
+            selected={selectedResources}
+            gapAnalysis={gapAnalysis}
+            sourceResources={sourceResources}
+            targetResources={targetResources}
+            onComplete={(s) => { setReplSummary(s); setStep(4) }}
+          />
+        )}
+        {step === 4 && (
+          <DoneStep
+            summary={replSummary}
+            logs={logs}
+            onRestart={() => { setStep(0); setLogs([]); setSourceResources(null); setTargetResources(null); setAgentStatuses({}) }}
+          />
+        )}
+      </main>
+
+      {/* WS disconnected warning */}
+      {wsStatus !== 'connected' && wsStatus !== 'connecting' && (
+        <div style={{
+          position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--amber-dim)', border: '1px solid rgba(245,158,11,0.3)',
+          borderRadius: 'var(--radius)', padding: '8px 18px', fontSize: 11,
+          color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: 8,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)', zIndex: 200
+        }}>
+          <AlertCircle size={13} />
+          WebSocket {wsStatus} — backend at ws://localhost:3007
+        </div>
+      )}
+
+      {/* Log drawer */}
+      {showLogs && <LogDrawer logs={logs} onClose={() => setShowLogs(false)} />}
+    </div>
+  )
+}
+
+// ─── App Root ──────────────────────────────────────────────────────────────────
+export default function App() {
+  const [persona, setPersona] = useState(null)
+  
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage onLogin={setPersona} />} />
+      <Route path="/" element={<LandingPage persona={persona} />} />
+      <Route path="/migration" element={persona ? <MigrationApp persona={persona} /> : <Navigate to="/login" replace />} />
+    </Routes>
+  )
+}
