@@ -602,6 +602,14 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
   const [scanning, setScanning] = useState(false)
   const [activeTab, setActiveTab] = useState('source')
 
+  const hasStartedRef = useRef(false)
+
+  const startScan = useCallback(() => {
+    setScanning(true); setSrcResources(null); setTgtResources(null)
+    send('discover_source', { platform: 'teradata', ...srcCfg })
+    setTimeout(() => send('discover_target', { platform: tgtCfg.platform || 'databricks', ...tgtCfg }), 800)
+  }, [send, srcCfg, tgtCfg])
+
   useEffect(() => {
     window.__discoveryHandler = (msg) => {
       if (msg.type === 'discovery_result') {
@@ -609,13 +617,12 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
         if (msg.environment === 'target') { setTgtResources(msg.resources); setTgtInsights(msg.insights); setScanning(false) }
       }
     }
-  }, [])
-
-  const startScan = () => {
-    setScanning(true); setSrcResources(null); setTgtResources(null)
-    send('discover_source', { platform: 'teradata', ...srcCfg })
-    setTimeout(() => send('discover_target', { platform: tgtCfg.platform || 'databricks', ...tgtCfg }), 800)
-  }
+    
+    if (!hasStartedRef.current) {
+      hasStartedRef.current = true
+      startScan()
+    }
+  }, [startScan])
 
   const StatPill = ({ label, value, color = 'cyan' }) => (
     <div style={{ textAlign: 'center', padding: '8px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)' }}>
@@ -645,7 +652,7 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
                 {datasets.map(d => (
                   <tr key={d.id} style={{ borderBottom: '1px solid var(--border-dim)' }}>
                     <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</td>
-                    <td style={{ padding: '6px 8px' }}><Badge color={d.type === 'VIEW' ? 'violet' : 'cyan'} size="sm">{d.type}</Badge></td>
+                    <td style={{ padding: '6px 8px' }}><Badge color={d.type === 'VIEW' ? 'violet' : d.type === 'PROCEDURE' ? 'amber' : 'cyan'} size="sm">{d.type}</Badge></td>
                     <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{d.schema || d.catalog || '—'}</td>
                     <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{d.row_count?.toLocaleString() || '—'}</td>
                     <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{d.size_mb ? `${d.size_mb}MB` : '—'}</td>
@@ -714,10 +721,15 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700 }}>Environment Discovery</div>
           <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>Scan both platforms, catalog all resources, generate AI insights</div>
         </div>
-        <Btn onClick={startScan} disabled={scanning} variant="primary"
-          icon={scanning ? <Spinner size={11} /> : <RefreshCw size={11} />}>
-          {scanning ? 'Scanning...' : srcResources ? 'Re-scan' : 'Start Discovery'}
-        </Btn>
+        {scanning ? (
+          <Btn disabled={true} variant="primary" icon={<Spinner size={11} />}>
+            Scanning...
+          </Btn>
+        ) : srcResources ? (
+          <Btn onClick={startScan} variant="primary" icon={<RefreshCw size={11} />}>
+            Re-scan
+          </Btn>
+        ) : null}
       </div>
 
       {(srcResources || tgtResources) && (
@@ -1077,7 +1089,10 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
                       name: item.name,
                       type: item.kind || 'dataset',
                       sourceTable: srcPlatform,
+                      sourceRows: totalRows,
                       targetTable: tgtPlatform,
+                      
+                      // targetRows: inserted,
                       inserted: inserted,
                       failedRows: failedRows,
                       status: status
@@ -1166,7 +1181,7 @@ const DoneStep = ({ summary, logs, tgtCfg, onRestart }) => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Table', 'Type', 'Source', 'Target', 'Inserted', 'Failed', 'Status'].map(h => (
+                  {['Table', 'Type', 'Source', 'Target', 'Source Rows', 'Inserted', 'Failed', 'Status'].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '10px 20px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                   ))}
                 </tr>
@@ -1180,6 +1195,8 @@ const DoneStep = ({ summary, logs, tgtCfg, onRestart }) => {
                     </td>
                     <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.sourceTable}</td>
                     <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.targetTable}</td>
+
+                    {/* <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.targetRows?.toLocaleString() : '—'}</td> */}
                     <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.inserted?.toLocaleString() : '—'}</td>
                     <td style={{ padding: '12px 20px', fontSize: 12, color: d.failedRows > 0 ? 'var(--accent-red)' : 'var(--text-dim)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.failedRows?.toLocaleString() : '—'}</td>
                     <td style={{ padding: '12px 20px' }}>
