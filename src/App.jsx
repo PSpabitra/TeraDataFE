@@ -6,7 +6,7 @@ import {
   Loader2, ChevronRight, Server, Cloud, Activity, BarChart2,
   FileText, Settings, RefreshCw, Table2, Workflow, Eye,
   Shield, ArrowRight, Circle, Check, X, Info, Clock,
-  Terminal, Layers, Search, Filter, TrendingUp, AlertTriangle
+  Terminal, Layers, Search, Filter, TrendingUp, AlertTriangle, LogOut
 } from 'lucide-react'
 
 const CLIENT_ID = `ui-${Math.random().toString(36).slice(2, 9)}`
@@ -54,7 +54,7 @@ const StatusDot = ({ status }) => {
   )
 }
 
-const Btn = ({ children, onClick, variant = 'primary', disabled = false, size = 'md', icon }) => {
+const Btn = ({ children, onClick, variant = 'primary', disabled = false, size = 'md', icon, style }) => {
   const base = {
     display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid',
     borderRadius: 'var(--radius)', cursor: disabled ? 'not-allowed' : 'pointer',
@@ -71,7 +71,7 @@ const Btn = ({ children, onClick, variant = 'primary', disabled = false, size = 
     violet: { background: 'var(--violet-dim)', color: 'var(--accent-violet)', borderColor: 'rgba(139,92,246,0.3)' },
   }
   return (
-    <button onClick={!disabled ? onClick : undefined} style={{ ...base, ...variants[variant] }}>
+    <button onClick={!disabled ? onClick : undefined} style={{ ...base, ...variants[variant], ...style }}>
       {icon && icon}{children}
     </button>
   )
@@ -179,7 +179,7 @@ const AgentBar = ({ agentStatuses }) => {
     ERROR: '#ef4444'
   }
   return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 8 }}>
       {agents.map(a => {
         const status = agentStatuses[a] || 'IDLE'
         const Icon = icons[a]
@@ -229,7 +229,7 @@ const LoginPage = ({ onLogin }) => {
       if (!res.ok) throw new Error('Invalid credentials')
       const data = await res.json()
       onLogin(data)
-      navigate('/')
+      navigate('/migration')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -260,7 +260,7 @@ const LoginPage = ({ onLogin }) => {
                 <AlertCircle size={12} style={{ display: 'inline', marginRight: 6 }} />{error}
               </div>
             )}
-            <Btn variant="primary" disabled={loading || !username || !password} style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}>
+            <Btn variant="primary" size="lg" disabled={loading || !username || !password} style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}>
               {loading ? <Spinner size={14} /> : 'Sign In'}
             </Btn>
           </form>
@@ -273,28 +273,84 @@ const LoginPage = ({ onLogin }) => {
 // ─── Landing Page ─────────────────────────────────────────────────────────────
 const LandingPage = ({ persona }) => {
   const navigate = useNavigate()
-  if (!persona) return <Navigate to="/login" replace />
-  
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ maxWidth: 600, textAlign: 'center' }} className="animate-fade">
-        <div style={{
-          width: 64, height: 64, borderRadius: 16, margin: '0 auto 24px',
-          background: 'linear-gradient(135deg, #38bdf8, #8b5cf6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <GitBranch size={32} style={{ color: '#fff' }} />
+    <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column' }}>
+
+      {/* Top Nav */}
+      <header style={{ padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-dim)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #38bdf8, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <GitBranch size={16} style={{ color: '#fff' }} />
+          </div>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, letterSpacing: '0.04em' }}>TeraMigrate</span>
         </div>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, marginBottom: 12 }}>
-          ETL Migration Platform
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 32 }}>
-          Welcome back, <strong style={{ color: 'var(--text-primary)' }}>{persona.username}</strong>. Ready to migrate some data?
-        </p>
-        <Btn variant="primary" size="lg" icon={<Play size={16} />} onClick={() => navigate('/migration')}>
-          Start New Migration
-        </Btn>
-      </div>
+        <div>
+          {persona ? (
+            <Btn variant="primary" onClick={() => navigate('/migration')}>Go to Dashboard</Btn>
+          ) : (
+            <Btn variant="ghost" onClick={() => navigate('/login')}>Sign In</Btn>
+          )}
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 24px', textAlign: 'center' }}>
+        <div className="animate-fade" style={{ maxWidth: 800 }}>
+          <Badge color="violet" size="lg" style={{ marginBottom: 24, fontSize: 12, padding: '4px 12px' }}>
+            Next-Gen ETL Migration
+          </Badge>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
+            Automate Your Journey from <br />
+            <span style={{ color: 'var(--accent-cyan)' }}>Teradata</span> to Modern Cloud
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 16, lineHeight: 1.6, marginBottom: 40, maxWidth: 600, margin: '0 auto 40px' }}>
+            Seamlessly transition your legacy ETL workloads to Databricks and Snowflake. AI-powered discovery, automated gap analysis, and intelligent code conversion.
+          </p>
+
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+            {persona ? (
+              <Btn variant="primary" size="lg" icon={<Play size={16} />} onClick={() => navigate('/migration')} style={{ padding: '14px 32px', fontSize: 14 }}>
+                Continue Migration ({persona.username})
+              </Btn>
+            ) : (
+              <Btn variant="primary" size="lg" icon={<ArrowRight size={16} />} onClick={() => navigate('/login')} style={{ padding: '14px 32px', fontSize: 14 }}>
+                Get Started
+              </Btn>
+            )}
+          </div>
+        </div>
+
+        {/* Feature Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 24, maxWidth: 1000, width: '100%', marginTop: 80 }} className="animate-fade">
+          <Card style={{ textAlign: 'left', padding: 24 }}>
+            <Search size={24} style={{ color: 'var(--accent-cyan)', marginBottom: 16 }} />
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Automated Discovery</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
+              Connect directly to Teradata to discover databases, tables, views, and complex stored procedures automatically.
+            </p>
+          </Card>
+          <Card style={{ textAlign: 'left', padding: 24 }}>
+            <Activity size={24} style={{ color: 'var(--accent-violet)', marginBottom: 16 }} />
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Gap Analysis</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
+              Identify syntax incompatibilities and structural differences between Teradata and your target cloud platform before migrating.
+            </p>
+          </Card>
+          <Card style={{ textAlign: 'left', padding: 24 }}>
+            <Zap size={24} style={{ color: 'var(--accent-green)', marginBottom: 16 }} />
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Intelligent Migration</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
+              Automatically convert legacy SQL, migrate table structures, and orchestrate real-time replication pipelines.
+            </p>
+          </Card>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 12, borderTop: '1px solid var(--border-dim)' }}>
+        &copy; {new Date().getFullYear()} TeraMigrate Platform. Designed for modern data teams.
+      </footer>
     </div>
   )
 }
@@ -383,7 +439,7 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
 
   const handleMsg = useCallback((msg) => {
     if (msg.type === 'connection_result') {
-      if (msg.connection_type === 'source') { 
+      if (msg.connection_type === 'source') {
         setSrcResult(msg.result); setSrcLoading(false)
         if (msg.result.status === 'connected' && persona?.id) {
           fetch(`${API}/api/v1/connections/save?persona_id=${persona.id}`, {
@@ -392,7 +448,7 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
           }).catch(console.error)
         }
       }
-      if (msg.connection_type === 'target') { 
+      if (msg.connection_type === 'target') {
         setTgtResult(msg.result); setTgtLoading(false)
         if (msg.result.status === 'connected' && persona?.id) {
           fetch(`${API}/api/v1/connections/save?persona_id=${persona.id}`, {
@@ -617,7 +673,7 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
         if (msg.environment === 'target') { setTgtResources(msg.resources); setTgtInsights(msg.insights); setScanning(false) }
       }
     }
-    
+
     if (!hasStartedRef.current) {
       hasStartedRef.current = true
       startScan()
@@ -669,7 +725,7 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr>{['Name', 'Type', 'Schedule', 'Status'].map(h => (
+                <tr>{['Name', 'Type', 'Status'].map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, fontWeight: 500, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)' }}>{h}</th>
                 ))}</tr>
               </thead>
@@ -678,7 +734,6 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
                   <tr key={p.id} style={{ borderBottom: '1px solid var(--border-dim)' }}>
                     <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-primary)', fontWeight: 500 }}>{p.name}</td>
                     <td style={{ padding: '6px 8px', fontSize: 10, color: 'var(--text-secondary)' }}>{p.type}</td>
-                    <td style={{ padding: '6px 8px', fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{p.schedule || '—'}</td>
                     <td style={{ padding: '6px 8px' }}><Badge color={p.status === 'ACTIVE' || p.status === 'RUNNING' ? 'green' : 'gray'}>{p.status || '—'}</Badge></td>
                   </tr>
                 ))}
@@ -1080,7 +1135,7 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
                     const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.status === 'DATASET_SUCCESS' || e.status === 'PIPELINE_SUCCESS')
                     const failed = itemEvents.some(e => e.status === 'ITEM_FAILED')
                     const status = finished ? 'Success' : failed ? 'Failed' : 'Pending'
-                    
+
                     const totalRows = item.row_count || 0
                     const inserted = finished ? totalRows : 0
                     const failedRows = failed ? totalRows : 0
@@ -1091,7 +1146,7 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
                       sourceTable: srcPlatform,
                       sourceRows: totalRows,
                       targetTable: tgtPlatform,
-                      
+
                       // targetRows: inserted,
                       inserted: inserted,
                       failedRows: failedRows,
@@ -1196,7 +1251,7 @@ const DoneStep = ({ summary, logs, tgtCfg, onRestart }) => {
                     <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.sourceTable}</td>
                     <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.targetTable}</td>
 
-                    {/* <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.targetRows?.toLocaleString() : '—'}</td> */}
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.sourceRows?.toLocaleString() : '—'}</td>
                     <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.inserted?.toLocaleString() : '—'}</td>
                     <td style={{ padding: '12px 20px', fontSize: 12, color: d.failedRows > 0 ? 'var(--accent-red)' : 'var(--text-dim)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.failedRows?.toLocaleString() : '—'}</td>
                     <td style={{ padding: '12px 20px' }}>
@@ -1264,7 +1319,7 @@ const formatLocalTime = (timestampStr) => {
 };
 
 // ─── Migration App ───────────────────────────────────────────────────────────────
-function MigrationApp({ persona }) {
+function MigrationApp({ persona, onLogout }) {
   const [step, setStep] = useState(0)
   const [agentStatuses, setAgentStatuses] = useState({})
   const [sourceResources, setSourceResources] = useState(null)
@@ -1323,9 +1378,9 @@ function MigrationApp({ persona }) {
             }}>
               <GitBranch size={15} style={{ color: '#fff' }} />
             </div>
-            <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em' }}>ETL Migration Platform</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Teradata → {tgtCfg?.platform === 'snowflake' ? 'Snowflake' : 'Databricks'}</div>
+            <div style={{ flexShrink: 0 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em', whiteSpace: 'nowrap', marginBottom: 4 }}>ETL Migration Platform</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Teradata → {tgtCfg?.platform === 'snowflake' ? 'Snowflake' : 'Databricks'}</div>
             </div>
           </div>
 
@@ -1335,6 +1390,9 @@ function MigrationApp({ persona }) {
             <StatusDot status={wsStatus} />
             <Btn size="sm" variant="ghost" onClick={() => setShowLogs(v => !v)} icon={<FileText size={11} />}>
               Logs {logs.length > 0 && <Badge color="amber" size="sm">{logs.length}</Badge>}
+            </Btn>
+            <Btn size="sm" variant="ghost" onClick={onLogout} icon={<LogOut size={11} />}>
+              Logout
             </Btn>
           </div>
         </div>
@@ -1417,13 +1475,29 @@ function MigrationApp({ persona }) {
 
 // ─── App Root ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [persona, setPersona] = useState(null)
-  
+  const [persona, setPersona] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tera_persona')
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })
+
+  const handleLogin = (p) => {
+    setPersona(p)
+    if (p) {
+      localStorage.setItem('tera_persona', JSON.stringify(p))
+    } else {
+      localStorage.removeItem('tera_persona')
+    }
+  }
+
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage onLogin={setPersona} />} />
+      <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
       <Route path="/" element={<LandingPage persona={persona} />} />
-      <Route path="/migration" element={persona ? <MigrationApp persona={persona} /> : <Navigate to="/login" replace />} />
+      <Route path="/migration" element={persona ? <MigrationApp persona={persona} onLogout={() => handleLogin(null)} /> : <Navigate to="/" replace />} />
     </Routes>
   )
 }
