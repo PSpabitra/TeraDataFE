@@ -1047,7 +1047,9 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
     setStarted(true); setEvents([]); setDone(false)
     send('start_replication', {
       selected_resources: selected.map(s => ({
+        ...s,
         id: s.id, name: s.name, type: s.kind || 'dataset',
+        original_type: s.type,
         columns: s.columns || [], row_count: s.row_count || 0, tags: s.tags || []
       })),
       source_platform: 'teradata',
@@ -1185,6 +1187,7 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
                     <span style={{ color, fontWeight: 500 }}>{evt.status}</span>
                     {evt.item && <span style={{ color: 'var(--text-secondary)', marginLeft: 8 }}>{evt.item}</span>}
                     {evt.message && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>{evt.message}</span>}
+                    {evt.error && <div style={{ color: 'var(--accent-red)', fontSize: 10, marginTop: 2, wordBreak: 'break-all' }}>Error: {evt.error}</div>}
                     {evt.detail && <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 2, wordBreak: 'break-all' }}>{evt.detail.slice(0, 120)}</div>}
                   </div>
                 </div>
