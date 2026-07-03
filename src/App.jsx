@@ -848,8 +848,9 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
 }
 
 // ─── Step 3: Analyze ──────────────────────────────────────────────────────────
-const AnalyzeStep = ({ send, sourceResources, targetResources, onComplete }) => {
+const AnalyzeStep = ({ send, sourceResources, targetResources, onComplete, tgtCfg }) => {
   const [selected, setSelected] = useState([])
+  const [targetTypes, setTargetTypes] = useState({})
   const [gapAnalysis, setGapAnalysis] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
 
@@ -924,8 +925,22 @@ const AnalyzeStep = ({ send, sourceResources, targetResources, onComplete }) => 
                       {item.name}
                       {isPII && <Shield size={10} style={{ color: 'var(--accent-red)' }} />}
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
-                      {item.schema || item.type} {item.row_count ? `· ${item.row_count.toLocaleString()} rows` : ''}
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{item.schema || item.type} {item.row_count ? `· ${item.row_count.toLocaleString()} rows` : ''}</span>
+                      {sel && (item.type === 'PROCEDURE' || item.type === 'STORED_PROCEDURE') && tgtCfg?.platform === 'databricks' && (
+                        <select 
+                          value={targetTypes[item.name] || 'DATABRICKS_WORKFLOW'}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => { e.stopPropagation(); setTargetTypes(p => ({...p, [item.name]: e.target.value})) }}
+                          style={{
+                            background: 'var(--bg-void)', border: '1px solid var(--border-dim)', borderRadius: 4,
+                            color: 'var(--text-secondary)', fontSize: 9, padding: '2px 4px', outline: 'none'
+                          }}
+                        >
+                          <option value="DATABRICKS_WORKFLOW">Pipeline (PySpark)</option>
+                          <option value="DATABRICKS_SQL_SP">Stored Procedure (SQL)</option>
+                        </select>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -1009,7 +1024,7 @@ const AnalyzeStep = ({ send, sourceResources, targetResources, onComplete }) => 
               )}
 
               <div style={{ marginTop: 14 }}>
-                <Btn onClick={() => onComplete(selected, gapAnalysis)} variant="primary" size="lg" icon={<ChevronRight size={14} />}>
+                <Btn onClick={() => onComplete(selected, gapAnalysis, targetTypes)} variant="primary" size="lg" icon={<ChevronRight size={14} />}>
                   Start Replication
                 </Btn>
               </div>
@@ -1022,7 +1037,7 @@ const AnalyzeStep = ({ send, sourceResources, targetResources, onComplete }) => 
 }
 
 // ─── Step 4: Replicate ────────────────────────────────────────────────────────
-const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetResources, srcCfg, tgtCfg, onComplete }) => {
+const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetResources, srcCfg, tgtCfg, targetTypes, onComplete }) => {
   const [events, setEvents] = useState([])
   const [started, setStarted] = useState(false)
   const [done, setDone] = useState(false)
@@ -1050,6 +1065,7 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
         ...s,
         id: s.id, name: s.name, type: s.kind || 'dataset',
         original_type: s.type,
+        target_type: targetTypes?.[s.name] || undefined,
         columns: s.columns || [], row_count: s.row_count || 0, tags: s.tags || []
       })),
       source_platform: 'teradata',
@@ -1329,11 +1345,16 @@ function MigrationApp({ persona, onLogout }) {
   const [targetResources, setTargetResources] = useState(null)
   const [selectedResources, setSelectedResources] = useState([])
   const [gapAnalysis, setGapAnalysis] = useState(null)
-  const [replSummary, setReplSummary] = useState(null)
+  const [summary, setSummary] = useState(null)
+  const targetTypesRef = useRef({})
   const [logs, setLogs] = useState([])
   const [showLogs, setShowLogs] = useState(false)
   const [srcCfg, setSrcCfg] = useState({})
   const [tgtCfg, setTgtCfg] = useState({})
+  const srcRef = useRef(srcCfg)
+  const tgtRef = useRef(tgtCfg)
+  useEffect(() => { srcRef.current = srcCfg }, [srcCfg])
+  useEffect(() => { tgtRef.current = tgtCfg }, [tgtCfg])
 
   // Route all incoming WS messages
   const handleMessage = useCallback((msg) => {
@@ -1431,7 +1452,8 @@ function MigrationApp({ persona, onLogout }) {
             send={wrappedSend}
             sourceResources={sourceResources}
             targetResources={targetResources}
-            onComplete={(sel, gap) => { setSelectedResources(sel); setGapAnalysis(gap); setStep(3) }}
+            tgtCfg={tgtCfg}
+            onComplete={(sel, gap, tt) => { setSelectedResources(sel); setGapAnalysis(gap); targetTypesRef.current = tt; setStep(3) }}
           />
         )}
         {step === 3 && (
@@ -1443,12 +1465,13 @@ function MigrationApp({ persona, onLogout }) {
             targetResources={targetResources}
             srcCfg={srcCfg}
             tgtCfg={tgtCfg}
-            onComplete={(s) => { setReplSummary(s); setStep(4) }}
+            targetTypes={targetTypesRef.current}
+            onComplete={(s) => { setSummary(s); setStep(4) }}
           />
         )}
         {step === 4 && (
           <DoneStep
-            summary={replSummary}
+            summary={summary}
             logs={logs}
             tgtCfg={tgtCfg}
             onRestart={() => { setStep(0); setLogs([]); setSourceResources(null); setTargetResources(null); setAgentStatuses({}) }}
