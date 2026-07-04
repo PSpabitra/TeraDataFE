@@ -378,18 +378,17 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
             const credsMap = {}
             data.credentials.forEach(c => {
               credsMap[c.platform] = c
-              if (c.platform === 'teradata') {
-                setSrc(p => ({
-                  ...p,
-                  host: c.host || '',
-                  username: c.username || '',
-                  password: c.password || '',
-                  database: c.database_name || '',
-                  port: c.port || '1025'
-                }))
-              }
             })
             setSavedCreds(credsMap)
+            const c = credsMap['teradata'] || {}
+            setSrc(p => ({
+              ...p,
+              host: c.host || '',
+              username: c.username || '',
+              password: c.password || '',
+              database: c.database_name || '',
+              port: String(c.port || '1025')
+            }))
             const dbCred = data.credentials.find(c => c.platform === 'databricks')
             const sfCred = data.credentials.find(c => c.platform === 'snowflake')
             if (dbCred) {
@@ -421,6 +420,19 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
     }
   }, [persona?.id])
 
+  const handleSourcePlatformChange = (platform) => {
+    const cred = savedCreds[platform] || {}
+    setSrc({
+      platform,
+      host: cred.host || '',
+      username: cred.username || '',
+      password: cred.password || '',
+      database: cred.database_name || '',
+      port: String(cred.port || (platform === 'mysql' ? '3306' : '1025'))
+    })
+    setSrcResult(null)
+  }
+
   const handlePlatformChange = (platform) => {
     const cred = savedCreds[platform] || {}
     setTgt({
@@ -444,7 +456,12 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
         if (msg.result.status === 'connected' && persona?.id) {
           fetch(`${API}/api/v1/connections/save?persona_id=${persona.id}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...srcRef.current, port: parseInt(srcRef.current.port) || 1025 })
+            body: JSON.stringify({
+              ...srcRef.current,
+              port: parseInt(srcRef.current.port) || (srcRef.current.platform === 'mysql' ? 3306 : 1025)
+            })
+          }).then(() => {
+            setSavedCreds(prev => ({ ...prev, [srcRef.current.platform]: srcRef.current }))
           }).catch(console.error)
         }
       }
@@ -467,7 +484,10 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
 
   const connectSrc = () => {
     setSrcLoading(true); setSrcResult(null)
-    send('connect_source', { ...src, port: parseInt(src.port) || 1025 })
+    send('connect_source', {
+      ...src,
+      port: parseInt(src.port) || (src.platform === 'mysql' ? 3306 : 1025)
+    })
   }
   const connectTgt = () => {
     setTgtLoading(true); setTgtResult(null)
@@ -486,18 +506,51 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
           </div>
           <div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600 }}>Source Platform</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Teradata Data Warehouse</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{src.platform === 'mysql' ? 'MySQL Database' : 'Teradata Data Warehouse'}</div>
           </div>
           {srcResult && <Badge color={srcResult.status === 'connected' ? 'green' : 'red'} style={{ marginLeft: 'auto' }}>
             {srcResult.status}
           </Badge>}
         </div>
-        <Field label="Host" value={src.host} onChange={v => setSrc(p => ({ ...p, host: v }))} placeholder="teradata-host.company.com" required />
-        <Field label="Username" value={src.username} onChange={v => setSrc(p => ({ ...p, username: v }))} placeholder="dbc" required />
+
+        {/* Source Platform Toggle buttons */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          <button
+            type="button"
+            onClick={() => handleSourcePlatformChange('teradata')}
+            style={{
+              flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
+              background: src.platform === 'teradata' ? 'var(--bg-active)' : 'transparent',
+              borderColor: src.platform === 'teradata' ? 'var(--border-bright)' : 'var(--border-dim)',
+              color: src.platform === 'teradata' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)', cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            Teradata
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSourcePlatformChange('mysql')}
+            style={{
+              flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
+              background: src.platform === 'mysql' ? 'var(--bg-active)' : 'transparent',
+              borderColor: src.platform === 'mysql' ? 'var(--border-bright)' : 'var(--border-dim)',
+              color: src.platform === 'mysql' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)', cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            MySQL
+          </button>
+        </div>
+
+        <Field label="Host" value={src.host} onChange={v => setSrc(p => ({ ...p, host: v }))} placeholder={src.platform === 'mysql' ? 'localhost' : 'teradata-host.company.com'} required />
+        <Field label="Username" value={src.username} onChange={v => setSrc(p => ({ ...p, username: v }))} placeholder={src.platform === 'mysql' ? 'root' : 'dbc'} required />
         <Field label="Password" value={src.password} onChange={v => setSrc(p => ({ ...p, password: v }))} password required />
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
-          <Field label="Database" value={src.database} onChange={v => setSrc(p => ({ ...p, database: v }))} placeholder="PROD_DW" />
-          <Field label="Port" value={src.port} onChange={v => setSrc(p => ({ ...p, port: v }))} placeholder="1025" />
+          <Field label="Database" value={src.database} onChange={v => setSrc(p => ({ ...p, database: v }))} placeholder={src.platform === 'mysql' ? 'mydb' : 'PROD_DW'} />
+          <Field label="Port" value={src.port} onChange={v => setSrc(p => ({ ...p, port: v }))} placeholder={src.platform === 'mysql' ? '3306' : '1025'} />
         </div>
         {srcResult?.status === 'failed' && (
           <div style={{ padding: '8px 12px', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius)', marginBottom: 12, fontSize: 11, color: 'var(--accent-red)' }}>
@@ -523,7 +576,7 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
         <Btn onClick={connectSrc} disabled={srcLoading || !src.host || !src.username || wsStatus !== 'connected'}
           variant={srcResult?.status === 'connected' ? 'success' : 'primary'} size="sm"
           icon={srcLoading ? <Spinner size={11} /> : <Server size={11} />}>
-          {srcLoading ? 'Connecting...' : srcResult?.status === 'connected' ? 'Reconnect' : 'Connect Teradata'}
+          {srcLoading ? 'Connecting...' : srcResult?.status === 'connected' ? 'Reconnect' : `Connect ${src.platform === 'mysql' ? 'MySQL' : 'Teradata'}`}
         </Btn>
       </Card>
 
@@ -662,7 +715,7 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
 
   const startScan = useCallback(() => {
     setScanning(true); setSrcResources(null); setTgtResources(null)
-    send('discover_source', { platform: 'teradata', ...srcCfg })
+    send('discover_source', { platform: srcCfg.platform || 'teradata', ...srcCfg })
     setTimeout(() => send('discover_target', { platform: tgtCfg.platform || 'databricks', ...tgtCfg }), 800)
   }, [send, srcCfg, tgtCfg])
 
@@ -801,7 +854,7 @@ const DiscoverStep = ({ send, sourceResult, targetResult, onComplete, srcCfg, tg
                 display: 'flex', alignItems: 'center', gap: 6
               }}>
                 {t === 'source' ? <Database size={11} /> : (tgtCfg?.platform === 'snowflake' ? <Database size={11} /> : <Cloud size={11} />)}
-                {t === 'source' ? 'Teradata Source' : `${tgtCfg?.platform === 'snowflake' ? 'Snowflake' : 'Databricks'} Target`}
+                {t === 'source' ? (srcCfg.platform === 'mysql' ? 'MySQL Source' : 'Teradata Source') : `${tgtCfg?.platform === 'snowflake' ? 'Snowflake' : 'Databricks'} Target`}
                 {t === 'source' && srcResources && <Badge color="green" size="sm">✓</Badge>}
                 {t === 'target' && tgtResources && <Badge color="green" size="sm">✓</Badge>}
               </button>
@@ -1068,7 +1121,7 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
         target_type: targetTypes?.[s.name] || undefined,
         columns: s.columns || [], row_count: s.row_count || 0, tags: s.tags || []
       })),
-      source_platform: 'teradata',
+      source_platform: srcCfg?.platform || 'teradata',
       target_platform: tgtCfg?.platform || 'databricks',
       gap_analysis: gapAnalysis?.gap_analysis || {}
     })
@@ -1145,7 +1198,7 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
               </div>
               <div style={{ marginTop: 10 }}>
                 <Btn onClick={() => {
-                  const srcPlatform = srcCfg?.platform ? srcCfg.platform.charAt(0).toUpperCase() + srcCfg.platform.slice(1) : 'Teradata'
+                  const srcPlatform = srcCfg?.platform === 'mysql' ? 'MySQL' : (srcCfg?.platform ? srcCfg.platform.charAt(0).toUpperCase() + srcCfg.platform.slice(1) : 'Teradata')
                   const tgtPlatform = tgtCfg?.platform ? tgtCfg.platform.charAt(0).toUpperCase() + tgtCfg.platform.slice(1) : 'Databricks'
 
                   const details = selected.map(item => {
@@ -1404,7 +1457,7 @@ function MigrationApp({ persona, onLogout }) {
             </div>
             <div style={{ flexShrink: 0 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em', whiteSpace: 'nowrap', marginBottom: 4 }}>ETL Migration Platform</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Teradata → {tgtCfg?.platform === 'snowflake' ? 'Snowflake' : 'Databricks'}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{(srcCfg?.platform === 'mysql' ? 'MySQL' : 'Teradata')} → {tgtCfg?.platform === 'snowflake' ? 'Snowflake' : 'Databricks'}</div>
             </div>
           </div>
 
