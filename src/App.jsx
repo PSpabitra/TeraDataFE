@@ -917,7 +917,8 @@ const AnalyzeStep = ({ send, sourceResources, targetResources, onComplete, tgtCf
   }, [])
 
   const allItems = [
-    ...(sourceResources?.datasets || []).map(d => ({ ...d, kind: 'dataset' })),
+    // Filter out stored procedures from datasets (they appear in pipelines instead)
+    ...(sourceResources?.datasets || []).filter(d => d.type !== 'PROCEDURE' && d.type !== 'STORED_PROCEDURE').map(d => ({ ...d, kind: 'dataset' })),
     ...(sourceResources?.pipelines || []).map(p => ({ ...p, kind: 'pipeline' }))
   ]
 
