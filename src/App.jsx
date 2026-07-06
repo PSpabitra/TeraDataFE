@@ -1119,7 +1119,7 @@ const ReplicateStep = ({ send, selected, gapAnalysis, sourceResources, targetRes
         ...s,
         id: s.id, name: s.name, type: s.kind || 'dataset',
         original_type: s.type,
-        target_type: targetTypes?.[s.name] || undefined,
+        target_type: targetTypes?.[s.name] || ((s.type === 'PROCEDURE' || s.type === 'STORED_PROCEDURE') ? 'DATABRICKS_WORKFLOW' : undefined),
         columns: s.columns || [], row_count: s.row_count || 0, tags: s.tags || []
       })),
       source_platform: srcCfg?.platform || 'teradata',
