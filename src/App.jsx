@@ -391,6 +391,7 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
             }))
             const dbCred = data.credentials.find(c => c.platform === 'databricks')
             const sfCred = data.credentials.find(c => c.platform === 'snowflake')
+            const ssCred = data.credentials.find(c => c.platform === 'sqlserver')
             if (dbCred) {
               setTgt({
                 platform: 'databricks',
@@ -413,6 +414,18 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
                 password: sfCred.password || '',
                 database: sfCred.database_name || '',
                 schema: sfCred.schema || 'PUBLIC'
+              })
+            } else if (ssCred) {
+              setTgt({
+                platform: 'sqlserver',
+                host: ssCred.host || '',
+                token: '',
+                cluster_id: '',
+                warehouse_id: ssCred.warehouse_id || '1433',
+                username: ssCred.username || '',
+                password: ssCred.password || '',
+                database: ssCred.database_name || '',
+                schema: 'dbo'
               })
             }
           }
@@ -585,11 +598,11 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
           <div style={{
             padding: 7,
-            background: tgt.platform === 'snowflake' ? 'rgba(56,189,248,0.1)' : 'rgba(139,92,246,0.1)',
+            background: tgt.platform === 'snowflake' || tgt.platform === 'sqlserver' ? 'rgba(56,189,248,0.1)' : 'rgba(139,92,246,0.1)',
             borderRadius: 'var(--radius)',
-            border: `1px solid ${tgt.platform === 'snowflake' ? 'rgba(56,189,248,0.2)' : 'rgba(139,92,246,0.2)'}`
+            border: `1px solid ${tgt.platform === 'snowflake' || tgt.platform === 'sqlserver' ? 'rgba(56,189,248,0.2)' : 'rgba(139,92,246,0.2)'}`
           }}>
-            {tgt.platform === 'snowflake' ? (
+            {tgt.platform === 'snowflake' || tgt.platform === 'sqlserver' ? (
               <Database size={16} style={{ color: 'var(--accent-cyan)' }} />
             ) : (
               <Cloud size={16} style={{ color: 'var(--accent-violet)' }} />
@@ -598,7 +611,7 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
           <div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600 }}>Target Platform</div>
             <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-              {tgt.platform === 'snowflake' ? 'Snowflake Data Cloud' : 'Databricks Lakehouse'}
+              {tgt.platform === 'snowflake' ? 'Snowflake Data Cloud' : tgt.platform === 'sqlserver' ? 'SQL Server (SSMS)' : 'Databricks Lakehouse'}
             </div>
           </div>
           {tgtResult && <Badge color={tgtResult.status === 'connected' ? 'green' : 'red'} style={{ marginLeft: 'auto' }}>
@@ -636,6 +649,20 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
           >
             Snowflake
           </button>
+          <button
+            type="button"
+            onClick={() => handlePlatformChange('sqlserver')}
+            style={{
+              flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
+              background: tgt.platform === 'sqlserver' ? 'var(--bg-active)' : 'transparent',
+              borderColor: tgt.platform === 'sqlserver' ? 'var(--border-bright)' : 'var(--border-dim)',
+              color: tgt.platform === 'sqlserver' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)', cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            SQL Server
+          </button>
         </div>
 
         {tgt.platform === 'databricks' ? (
@@ -644,6 +671,16 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
             <Field label="Access Token" value={tgt.token} onChange={v => setTgt(p => ({ ...p, token: v }))} password placeholder="dapi..." required />
             <Field label="Cluster ID" value={tgt.cluster_id} onChange={v => setTgt(p => ({ ...p, cluster_id: v }))} placeholder="0101-123456-abc" />
             <Field label="SQL Warehouse ID" value={tgt.warehouse_id} onChange={v => setTgt(p => ({ ...p, warehouse_id: v }))} placeholder="abc123def" />
+          </>
+        ) : tgt.platform === 'sqlserver' ? (
+          <>
+            <Field label="Server Host" value={tgt.host} onChange={v => setTgt(p => ({ ...p, host: v }))} placeholder="localhost or 192.168.1.100" required />
+            <Field label="Username" value={tgt.username || ''} onChange={v => setTgt(p => ({ ...p, username: v }))} placeholder="sa" required />
+            <Field label="Password" value={tgt.password || ''} onChange={v => setTgt(p => ({ ...p, password: v }))} password placeholder="••••••••" required />
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+              <Field label="Database" value={tgt.database || ''} onChange={v => setTgt(p => ({ ...p, database: v }))} placeholder="TargetDB" />
+              <Field label="Port" value={tgt.warehouse_id || ''} onChange={v => setTgt(p => ({ ...p, warehouse_id: v }))} placeholder="1433" />
+            </div>
           </>
         ) : (
           <>
@@ -685,9 +722,9 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
             ? (tgtLoading || !tgt.host || !tgt.token || wsStatus !== 'connected')
             : (tgtLoading || !tgt.host || !tgt.username || !tgt.password || wsStatus !== 'connected')
         }
-          variant={tgtResult?.status === 'connected' ? 'success' : (tgt.platform === 'snowflake' ? 'primary' : 'violet')} size="sm"
-          icon={tgtLoading ? <Spinner size={11} /> : (tgt.platform === 'snowflake' ? <Database size={11} /> : <Cloud size={11} />)}>
-          {tgtLoading ? 'Connecting...' : tgtResult?.status === 'connected' ? 'Reconnect' : `Connect ${tgt.platform === 'databricks' ? 'Databricks' : 'Snowflake'}`}
+          variant={tgtResult?.status === 'connected' ? 'success' : (tgt.platform === 'snowflake' || tgt.platform === 'sqlserver' ? 'primary' : 'violet')} size="sm"
+          icon={tgtLoading ? <Spinner size={11} /> : (tgt.platform === 'snowflake' || tgt.platform === 'sqlserver' ? <Database size={11} /> : <Cloud size={11} />)}>
+          {tgtLoading ? 'Connecting...' : tgtResult?.status === 'connected' ? 'Reconnect' : `Connect ${tgt.platform === 'databricks' ? 'Databricks' : tgt.platform === 'snowflake' ? 'Snowflake' : 'SQL Server'}`}
         </Btn>
       </Card>
 
