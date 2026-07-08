@@ -519,7 +519,7 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
           </div>
           <div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600 }}>Source Platform</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{src.platform === 'mysql' ? 'MySQL Database' : 'Teradata Data Warehouse'}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{src.platform === 'mssql' ? 'SQL Server' : src.platform === 'mysql' ? 'MySQL Database' : 'Teradata Data Warehouse'}</div>
           </div>
           {srcResult && <Badge color={srcResult.status === 'connected' ? 'green' : 'red'} style={{ marginLeft: 'auto' }}>
             {srcResult.status}
@@ -556,14 +556,28 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
           >
             MySQL
           </button>
+          <button
+            type="button"
+            onClick={() => handleSourcePlatformChange('mssql')}
+            style={{
+              flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
+              background: src.platform === 'mssql' ? 'var(--bg-active)' : 'transparent',
+              borderColor: src.platform === 'mssql' ? 'var(--border-bright)' : 'var(--border-dim)',
+              color: src.platform === 'mssql' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)', cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            MSSQL
+          </button>
         </div>
 
-        <Field label="Host" value={src.host} onChange={v => setSrc(p => ({ ...p, host: v }))} placeholder={src.platform === 'mysql' ? 'localhost' : 'teradata-host.company.com'} required />
-        <Field label="Username" value={src.username} onChange={v => setSrc(p => ({ ...p, username: v }))} placeholder={src.platform === 'mysql' ? 'root' : 'dbc'} required />
+        <Field label="Host" value={src.host} onChange={v => setSrc(p => ({ ...p, host: v }))} placeholder={src.platform === 'mssql' ? 'localhost' : src.platform === 'mysql' ? 'localhost' : 'teradata-host.company.com'} required />
+        <Field label="Username" value={src.username} onChange={v => setSrc(p => ({ ...p, username: v }))} placeholder={src.platform === 'mssql' ? 'sa' : src.platform === 'mysql' ? 'root' : 'dbc'} required />
         <Field label="Password" value={src.password} onChange={v => setSrc(p => ({ ...p, password: v }))} password required />
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
-          <Field label="Database" value={src.database} onChange={v => setSrc(p => ({ ...p, database: v }))} placeholder={src.platform === 'mysql' ? 'mydb' : 'PROD_DW'} />
-          <Field label="Port" value={src.port} onChange={v => setSrc(p => ({ ...p, port: v }))} placeholder={src.platform === 'mysql' ? '3306' : '1025'} />
+          <Field label="Database" value={src.database} onChange={v => setSrc(p => ({ ...p, database: v }))} placeholder={src.platform === 'mssql' ? 'master' : src.platform === 'mysql' ? 'mydb' : 'PROD_DW'} />
+          <Field label="Port" value={src.port} onChange={v => setSrc(p => ({ ...p, port: v }))} placeholder={src.platform === 'mssql' ? '1433' : src.platform === 'mysql' ? '3306' : '1025'} />
         </div>
         {srcResult?.status === 'failed' && (
           <div style={{ padding: '8px 12px', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius)', marginBottom: 12, fontSize: 11, color: 'var(--accent-red)' }}>
@@ -589,7 +603,7 @@ const ConnectStep = ({ send, wsStatus, onComplete, persona }) => {
         <Btn onClick={connectSrc} disabled={srcLoading || !src.host || !src.username || wsStatus !== 'connected'}
           variant={srcResult?.status === 'connected' ? 'success' : 'primary'} size="sm"
           icon={srcLoading ? <Spinner size={11} /> : <Server size={11} />}>
-          {srcLoading ? 'Connecting...' : srcResult?.status === 'connected' ? 'Reconnect' : `Connect ${src.platform === 'mysql' ? 'MySQL' : 'Teradata'}`}
+          {srcLoading ? 'Connecting...' : srcResult?.status === 'connected' ? 'Reconnect' : `Connect ${src.platform === 'mssql' ? 'MSSQL' : src.platform === 'mysql' ? 'MySQL' : 'Teradata'}`}
         </Btn>
       </Card>
 
