@@ -7,12 +7,9 @@ import Badge from '../components/common/Badge'
 
 /**
  * DashboardPage component (Dummy operational dashboard).
- * @param {Object} props
- * @param {import('../types').Persona} props.persona
- * @param {function(): void} props.onLogout
  * @returns {React.ReactElement}
  */
-export default function DashboardPage({ persona, onLogout }) {
+export default function DashboardPage() {
   const navigate = useNavigate()
 
   const metrics = [
@@ -30,40 +27,7 @@ export default function DashboardPage({ persona, onLogout }) {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <header style={{
-        borderBottom: '1px solid var(--border-dim)',
-        background: 'rgba(13,17,23,0.85)', backdropFilter: 'blur(12px)',
-        position: 'sticky', top: 0, zIndex: 50
-      }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: 8,
-              background: 'linear-gradient(135deg, #38bdf8, #8b5cf6)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <Database size={15} style={{ color: '#fff' }} />
-            </div>
-            <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em' }}>Operations Dashboard</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>ETL Migration Platform</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Welcome, <strong>{persona?.name || 'User'}</strong></span>
-            <div style={{ width: 1, height: 20, background: 'var(--border-dim)' }} />
-            <Btn size="sm" variant="ghost" onClick={onLogout} icon={<LogOut size={11} />}>
-              Logout
-            </Btn>
-          </div>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main style={{ flex: 1, maxWidth: 1280, width: '100%', margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 32 }}>
+    <main style={{ flex: 1, maxWidth: 1280, width: '100%', margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 32 }}>
         
         {/* Banner */}
         <div style={{
@@ -198,6 +162,5 @@ export default function DashboardPage({ persona, onLogout }) {
         </div>
 
       </main>
-    </div>
   )
 }

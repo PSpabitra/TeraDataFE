@@ -4,6 +4,8 @@ import LoginPage from './pages/LoginPage.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import MigrationApp from './pages/MigrationApp.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
+import AppLayout from './components/layout/AppLayout.jsx'
+import { MigrationProvider } from './context/MigrationContext.jsx'
 
 export default function App() {
   const [persona, setPersona] = useState(() => {
@@ -28,8 +30,14 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
       <Route path="/" element={<LandingPage persona={persona} />} />
-      <Route path="/dashboard" element={persona ? <DashboardPage persona={persona} onLogout={() => handleLogin(null)} /> : <Navigate to="/" replace />} />
-      <Route path="/migration" element={persona ? <MigrationApp persona={persona} onLogout={() => handleLogin(null)} /> : <Navigate to="/" replace />} />
+      <Route element={persona ? (
+        <MigrationProvider initialPersona={persona} onLogout={() => handleLogin(null)}>
+          <AppLayout />
+        </MigrationProvider>
+      ) : <Navigate to="/" replace />}>
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/migration" element={<MigrationApp />} />
+      </Route>
     </Routes>
   )
 }
