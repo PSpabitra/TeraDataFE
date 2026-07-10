@@ -55,14 +55,14 @@ const DoneStep = () => {
                   <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
                     <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</td>
                     <td style={{ padding: '12px 20px' }}>
-                      <Badge color={d.type === 'pipeline' ? 'violet' : 'cyan'} size="sm">{d.type?.toUpperCase()}</Badge>
+                      <Badge color={(d.type === 'pipeline' || d.type === 'SP') ? 'violet' : 'cyan'} size="sm">{d.type?.toUpperCase()}</Badge>
                     </td>
                     <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.sourceTable}</td>
                     <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.targetTable}</td>
 
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.sourceRows?.toLocaleString() : '—'}</td>
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.inserted?.toLocaleString() : '—'}</td>
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: d.failedRows > 0 ? 'var(--accent-red)' : 'var(--text-dim)', fontWeight: 500 }}>{d.type !== 'pipeline' ? d.failedRows?.toLocaleString() : '—'}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{(d.type !== 'pipeline' && d.type !== 'SP') ? d.sourceRows?.toLocaleString() : '—'}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{(d.type !== 'pipeline' && d.type !== 'SP') ? d.inserted?.toLocaleString() : '—'}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: d.failedRows > 0 ? 'var(--accent-red)' : 'var(--text-dim)', fontWeight: 500 }}>{(d.type !== 'pipeline' && d.type !== 'SP') ? d.failedRows?.toLocaleString() : '—'}</td>
                     <td style={{ padding: '12px 20px' }}>
                       <Badge color={d.status === 'Success' ? 'green' : d.status === 'Failed' ? 'red' : 'amber'} size="sm">{d.status}</Badge>
                     </td>

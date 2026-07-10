@@ -90,7 +90,26 @@ const ReplicateStep = () => {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-                      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>{item.kind?.toUpperCase() || 'DATASET'}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>
+                        {(() => {
+                          let finalType = item.kind || 'dataset';
+                          if (item.type === 'STORED_PROCEDURE' || item.type === 'PROCEDURE') {
+                            const selectedTargetType = targetTypes?.[item.name];
+                            if (selectedTargetType === 'DATABRICKS_WORKFLOW') {
+                              finalType = 'pipeline';
+                            } else if (selectedTargetType === 'DATABRICKS_SQL_SP') {
+                              finalType = 'SP';
+                            } else {
+                              if (tgtCfg?.platform === 'databricks') {
+                                finalType = 'pipeline';
+                              } else {
+                                finalType = 'SP';
+                              }
+                            }
+                          }
+                          return finalType.toUpperCase();
+                        })()}
+                      </div>
                     </div>
                   </div>
                   {running && pct !== undefined && (
@@ -136,7 +155,24 @@ const ReplicateStep = () => {
 
                     return {
                       name: item.name,
-                      type: item.kind || 'dataset',
+                      type: (() => {
+                        let finalType = item.kind || 'dataset';
+                        if (item.type === 'STORED_PROCEDURE' || item.type === 'PROCEDURE') {
+                          const selectedTargetType = targetTypes?.[item.name];
+                          if (selectedTargetType === 'DATABRICKS_WORKFLOW') {
+                            finalType = 'pipeline';
+                          } else if (selectedTargetType === 'DATABRICKS_SQL_SP') {
+                            finalType = 'SP';
+                          } else {
+                            if (tgtCfg?.platform === 'databricks') {
+                              finalType = 'pipeline';
+                            } else {
+                              finalType = 'SP';
+                            }
+                          }
+                        }
+                        return finalType;
+                      })(),
                       sourceTable: srcPlatform,
                       sourceRows: totalRows,
                       targetTable: tgtPlatform,
