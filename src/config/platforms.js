@@ -60,5 +60,14 @@ export const TARGETS = {
     formComponent: SqlServerForm,
     label: 'SQL Server',
     iconType: 'database'
+  },
+  mysql: {
+    id: 'mysql',
+    name: 'MySQL',
+    description: 'MySQL Database',
+    isCloud: false,
+    formComponent: MysqlForm,
+    label: 'MySQL',
+    iconType: 'database'
   }
 }
