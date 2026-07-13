@@ -4,8 +4,17 @@ import MssqlForm from '../components/steps/connections/MssqlForm'
 import DatabricksForm from '../components/steps/connections/DatabricksForm'
 import SnowflakeForm from '../components/steps/connections/SnowflakeForm'
 import SqlServerForm from '../components/steps/connections/SqlServerForm'
+import DatastageForm from '../components/steps/connections/DatastageForm'
 
 export const SOURCES = {
+  datastage: {
+    id: 'datastage',
+    name: 'DataStage',
+    description: 'IBM DataStage',
+    defaultPort: 443,
+    formComponent: DatastageForm,
+    label: 'DataStage'
+  },
   teradata: {
     id: 'teradata',
     name: 'Teradata',
