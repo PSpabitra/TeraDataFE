@@ -5,6 +5,7 @@ import DatabricksForm from '../components/steps/connections/DatabricksForm'
 import SnowflakeForm from '../components/steps/connections/SnowflakeForm'
 import SqlServerForm from '../components/steps/connections/SqlServerForm'
 import DatastageForm from '../components/steps/connections/DatastageForm'
+import AdfForm from '../components/steps/connections/AdfForm'
 
 export const SOURCES = {
   datastage: {
@@ -38,6 +39,14 @@ export const SOURCES = {
     defaultPort: 1433,
     formComponent: MssqlForm,
     label: 'MSSQL'
+  },
+  adf: {
+    id: 'adf',
+    name: 'Azure Data Factory',
+    description: 'Azure Data Factory',
+    defaultPort: null,
+    formComponent: AdfForm,
+    label: 'ADF'
   }
 }
 
