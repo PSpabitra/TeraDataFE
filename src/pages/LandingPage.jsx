@@ -23,6 +23,22 @@ const LandingPage = ({ persona }) => {
     } catch {}
   }, [theme])
 
+  // Word rotation animation for the heading
+  const words = ['Teradata', 'MySQL', 'MSSQL', 'DataStage', 'ADF', 'Database']
+  const [wordIndex, setWordIndex] = useState(0)
+  const [fade, setFade] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFade(false)
+      setTimeout(() => {
+        setWordIndex((prev) => (prev + 1) % words.length)
+        setFade(true)
+      }, 300)
+    }, 2500)
+    return () => clearInterval(interval)
+  }, [])
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column' }}>
 
@@ -76,9 +92,20 @@ const LandingPage = ({ persona }) => {
           <Badge color="violet" size="lg" style={{ marginBottom: 24, fontSize: 12, padding: '4px 12px' }}>
             Next-Gen ETL Migration
           </Badge>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 45, fontWeight: 800, lineHeight: 1.5, marginBottom: 20 }}>
             Automate Your Journey from <br />
-            <span style={{ color: 'var(--accent-cyan)' }}>Database</span> to Modern Cloud
+            <span
+              style={{
+                color: 'var(--accent-cyan)',
+                transition: 'opacity 0.25s ease, transform 0.25s ease',
+                opacity: fade ? 1 : 0,
+                transform: fade ? 'translateY(0)' : 'translateY(-4px)',
+                display: 'inline-block',
+                minWidth: 160
+              }}
+            >
+              {words[wordIndex]}
+            </span> to Modern Cloud
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 16, lineHeight: 1.6, marginBottom: 40, maxWidth: 600, margin: '0 auto 40px' }}>
             Seamlessly transition your legacy ETL workloads to Databricks and Snowflake with intelligent discovery, automated gap analysis, and optimized code conversion.
@@ -99,21 +126,21 @@ const LandingPage = ({ persona }) => {
 
         {/* Feature Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 24, maxWidth: 1000, width: '100%', marginTop: 80 }} className="animate-fade">
-          <Card style={{ textAlign: 'left', padding: 24 }}>
+          <Card className="hover-card" style={{ textAlign: 'left', padding: 24 }}>
             <Search size={24} style={{ color: 'var(--accent-cyan)', marginBottom: 16 }} />
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Automated Discovery</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
               Connect directly to Teradata to discover databases, tables, views, and complex stored procedures automatically.
             </p>
           </Card>
-          <Card style={{ textAlign: 'left', padding: 24 }}>
+          <Card className="hover-card" style={{ textAlign: 'left', padding: 24 }}>
             <Activity size={24} style={{ color: 'var(--accent-violet)', marginBottom: 16 }} />
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Gap Analysis</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
               Identify syntax incompatibilities and structural differences between Teradata and your target cloud platform before migrating.
             </p>
           </Card>
-          <Card style={{ textAlign: 'left', padding: 24 }}>
+          <Card className="hover-card" style={{ textAlign: 'left', padding: 24 }}>
             <Zap size={24} style={{ color: 'var(--accent-green)', marginBottom: 16 }} />
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Intelligent Migration</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
