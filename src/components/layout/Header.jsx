@@ -62,45 +62,8 @@ export default function Header() {
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        {/* Left Side: Page Context */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 30,
-            height: 30,
-            borderRadius: 8,
-            background: 'linear-gradient(135deg, #38bdf8, #8b5cf6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            {isMigration ? (
-              <GitBranch size={15} style={{ color: '#fff' }} />
-            ) : (
-              <Database size={15} style={{ color: '#fff' }} />
-            )}
-          </div>
-          <div>
-            <div style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 13,
-              fontWeight: 700,
-              letterSpacing: '0.04em',
-              color: 'var(--text-primary)'
-            }}>
-              {isMigration ? 'ETL Migration Platform' : 'Operations Dashboard'}
-            </div>
-            <div style={{
-              fontSize: 9,
-              color: 'var(--text-dim)',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase'
-            }}>
-              {isMigration && srcCfg?.platform
-                ? `${srcCfg.platform.toUpperCase()} → ${tgtCfg?.platform ? tgtCfg.platform.toUpperCase() : 'TARGET'}`
-                : 'ETL Migration Platform'}
-            </div>
-          </div>
-        </div>
+        {/* Left Side: Page Context (Removed) */}
+        <div />
 
         {/* Right Side: Page Controls / User Info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>

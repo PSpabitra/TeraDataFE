@@ -34,7 +34,7 @@ export const SOURCES = {
   mssql: {
     id: 'mssql',
     name: 'MSSQL',
-    description: 'SQL Server',
+    description: 'MSSQL',
     defaultPort: 1433,
     formComponent: MssqlForm,
     label: 'MSSQL'
@@ -63,11 +63,11 @@ export const TARGETS = {
   },
   sqlserver: {
     id: 'sqlserver',
-    name: 'SQL Server',
-    description: 'SQL Server (SSMS)',
+    name: 'MSSQL',
+    description: 'MSSQL',
     isCloud: false,
     formComponent: SqlServerForm,
-    label: 'SQL Server',
+    label: 'MSSQL',
     iconType: 'database'
   },
   mysql: {
