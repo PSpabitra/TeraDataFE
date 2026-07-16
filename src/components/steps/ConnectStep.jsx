@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Database, Server, Cloud, AlertCircle, Check, ChevronRight } from 'lucide-react'
-import { getConnections, saveConnection } from '../../api/connections'
+import { getConnections, saveConnection, getMigrationConnections, saveMigrationConnection } from '../../api/connections'
 import Badge from '../common/Badge'
 import Spinner from '../common/Spinner'
 import Btn from '../common/Btn'
@@ -13,7 +13,7 @@ import { useMigration } from '../../context/MigrationContext'
  * @returns {React.ReactElement}
  */
 const ConnectStep = () => {
-  const { send, wsStatus, setStep, persona } = useMigration()
+  const { send, wsStatus, setStep, persona, connectionName, setConnectionName, replicationMode, setReplicationMode } = useMigration()
   const onComplete = () => setStep(1)
   const [src, setSrc] = useState({ platform: 'teradata', host: '', username: '', password: '', database: '', port: '1025' })
   const [tgt, setTgt] = useState({ platform: 'databricks', host: '', token: '', cluster_id: '', warehouse_id: '', username: '', password: '', database: '', schema: 'PUBLIC' })
@@ -23,9 +23,67 @@ const ConnectStep = () => {
   const [srcLoading, setSrcLoading] = useState(false)
   const [tgtLoading, setTgtLoading] = useState(false)
 
+  const [savedProfiles, setSavedProfiles] = useState([])
+  const [profilesLoading, setProfilesLoading] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [saveError, setSaveError] = useState(null)
+
   const srcRef = useRef(src)
   const tgtRef = useRef(tgt)
   useEffect(() => { srcRef.current = src; tgtRef.current = tgt }, [src, tgt])
+
+  const loadSavedProfiles = useCallback(() => {
+    if (persona?.id) {
+      setProfilesLoading(true)
+      getMigrationConnections(persona.id)
+        .then(data => {
+          setSavedProfiles(data.connections || [])
+          setProfilesLoading(false)
+        })
+        .catch(err => {
+          console.error("Failed to load connection history:", err)
+          setProfilesLoading(false)
+        })
+    }
+  }, [persona?.id])
+
+  useEffect(() => {
+    loadSavedProfiles()
+  }, [loadSavedProfiles])
+
+  const loadProfileIntoWizard = (p) => {
+    setConnectionName(p.connection_name)
+    setReplicationMode(p.replication_mode)
+    setSrc(p.source_config)
+    setTgt(p.target_config)
+    setSrcResult({ status: 'connected', metadata: { loaded: true } })
+    setTgtResult({ status: 'connected', metadata: { loaded: true } })
+  }
+
+  const handleSaveProfile = () => {
+    if (!connectionName || !persona?.id) return
+    setSaveLoading(true)
+    setSaveError(null)
+    saveMigrationConnection({
+      connection_name: connectionName,
+      persona_id: persona.id,
+      source_platform: src.platform,
+      source_config: src,
+      target_platform: tgt.platform,
+      target_config: tgt,
+      replication_mode: replicationMode
+    })
+    .then(() => {
+      setSaveLoading(false)
+      loadSavedProfiles()
+    })
+    .catch(err => {
+      console.error(err)
+      setSaveError(err.message || 'Failed to save connection profile')
+      setSaveLoading(false)
+    })
+  }
+
 
   useEffect(() => {
     if (persona?.id) {
@@ -313,13 +371,101 @@ const ConnectStep = () => {
       </Card>
 
       {bothConnected && (
-        <div style={{ gridColumn: '1/-1', display: 'flex', justifyContent: 'center', paddingTop: 4 }} className="animate-fade">
-          <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
-            Both platforms connected — Proceed to Discovery
-          </Btn>
-        </div>
+        <Card style={{ gridColumn: '1 / -1', padding: '20px 24px', border: '1px solid var(--border-glow)', marginTop: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700 }}>Connection Profile & Replication Settings</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Connection Profile Name *</label>
+                <input
+                  type="text"
+                  value={connectionName}
+                  onChange={e => setConnectionName(e.target.value)}
+                  placeholder="e.g. Prod MySQL to Databricks"
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)', padding: '7px 11px', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Default Replication Mode *</label>
+                <select
+                  value={replicationMode}
+                  onChange={e => setReplicationMode(e.target.value)}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)', padding: '7px 11px', color: 'var(--text-primary)', fontSize: 12, outline: 'none', cursor: 'pointer' }}
+                >
+                  <option value="create_and_insert">Create and Insert (Truncate & Reload)</option>
+                  <option value="incremental_update">Incremental Update (Merge / CDC)</option>
+                </select>
+              </div>
+            </div>
+            
+            {saveError && (
+              <div style={{ color: 'var(--accent-red)', fontSize: 11 }}>{saveError}</div>
+            )}
+            
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 10 }}>
+              <Btn onClick={handleSaveProfile} disabled={!connectionName || saveLoading} variant="violet" size="lg">
+                {saveLoading ? 'Saving Profile...' : 'Save Connection Profile'}
+              </Btn>
+              
+              <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
+                Proceed to Discovery
+              </Btn>
+            </div>
+          </div>
+        </Card>
       )}
+
+      {/* Connection History List */}
+      <Card style={{ gridColumn: '1 / -1', marginTop: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 15 }}>
+          <Database size={16} style={{ color: 'var(--text-secondary)' }} />
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700 }}>Saved Connection Profiles</h2>
+        </div>
+        
+        {profilesLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
+            <Spinner size={20} />
+          </div>
+        ) : savedProfiles.length === 0 ? (
+          <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: '20px 0', fontSize: 12 }}>
+            No saved connection profiles found. Complete both connections and enter a name to save.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                  {['Profile Name', 'Source', 'Target', 'Default Mode', 'Created At', 'Action'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {savedProfiles.map((p, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{p.connection_name}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{p.source_platform}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{p.target_platform}</td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <Badge color={p.replication_mode === 'incremental_update' ? 'amber' : 'green'} size="sm">
+                        {p.replication_mode === 'incremental_update' ? 'Incremental' : 'Create & Insert'}
+                      </Badge>
+                    </td>
+                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-muted)' }}>{new Date(p.created_at).toLocaleString()}</td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <Btn onClick={() => loadProfileIntoWizard(p)} size="sm" variant="ghost">Load Config</Btn>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
+
   )
 }
 

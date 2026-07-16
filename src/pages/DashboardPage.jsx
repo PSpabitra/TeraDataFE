@@ -1,30 +1,80 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Database, TrendingUp, Layers, PlayCircle, ShieldCheck, History, ChevronRight, Activity, ArrowUpRight, LogOut } from 'lucide-react'
 import Card from '../components/common/Card'
 import Btn from '../components/common/Btn'
 import Badge from '../components/common/Badge'
+import { API } from '../utils/constants'
+import { useMigration } from '../context/MigrationContext'
 
 /**
- * DashboardPage component (Dummy operational dashboard).
+ * DashboardPage component (Dynamic operational dashboard).
  * @returns {React.ReactElement}
  */
 export default function DashboardPage() {
   const navigate = useNavigate()
+  const { persona } = useMigration()
+  const [runs, setRuns] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const url = persona?.id
+      ? `${API}/api/v1/replication/recent-runs?persona_id=${persona.id}`
+      : `${API}/api/v1/replication/recent-runs`
+
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        setRuns(data.runs || [])
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error("Error loading recent runs:", err)
+        setLoading(false)
+      })
+  }, [persona?.id])
+
+  // Compute metrics dynamically from the fetched runs
+  let totalVolumeGB = 0
+  let activeRuns = 0
+  let totalTables = 0
+  let successfulRuns = 0
+  let totalRuns = runs.length
+
+  runs.forEach(r => {
+    if (r.status === 'Running') activeRuns++
+    if (r.status === 'Success' || r.status === 'COMPLETED') {
+      successfulRuns++
+      if (r.tables) totalTables += r.tables
+      
+      // parse size
+      if (r.size) {
+        const num = parseFloat(r.size)
+        if (!isNaN(num)) {
+          if (r.size.toUpperCase().includes('GB')) {
+            totalVolumeGB += num
+          } else if (r.size.toUpperCase().includes('MB')) {
+            totalVolumeGB += num / 1024
+          }
+        }
+      }
+    } else if (r.status === 'Failed') {
+      // counted in total but not successful
+    }
+  })
+
+  const successRate = totalRuns > 0 ? ((successfulRuns / totalRuns) * 100).toFixed(2) + '%' : '100%'
+  const formattedVolume = totalVolumeGB >= 1024 
+    ? (totalVolumeGB / 1024).toFixed(2) + ' TB' 
+    : totalVolumeGB.toFixed(1) + ' GB'
 
   const metrics = [
-    { label: 'Total Data Migrated', value: '1.42 TB', change: '+12.4%', icon: <TrendingUp size={16} />, color: 'cyan' },
-    { label: 'Active Pipelines', value: '4 Running', change: 'Stable', icon: <Activity size={16} />, color: 'violet' },
-    { label: 'Tables Migrated', value: '142', change: '+8 this week', icon: <Layers size={16} />, color: 'green' },
-    { label: 'Avg Success Rate', value: '99.85%', change: '+0.1%', icon: <ShieldCheck size={16} />, color: 'amber' },
+    { label: 'Total Data Migrated', value: formattedVolume, change: 'Stable', icon: <TrendingUp size={16} />, color: 'cyan' },
+    { label: 'Active Pipelines', value: `${activeRuns} Running`, change: 'Stable', icon: <Activity size={16} />, color: 'violet' },
+    { label: 'Tables Migrated', value: String(totalTables), change: 'Stable', icon: <Layers size={16} />, color: 'green' },
+    { label: 'Avg Success Rate', value: successRate, change: 'Stable', icon: <ShieldCheck size={16} />, color: 'amber' },
   ]
 
-  const recentruns = [
-    { id: 'MIG-8092', source: 'Teradata', target: 'Databricks', tables: 18, size: '240 GB', date: '2026-07-08 14:22', status: 'Success' },
-    { id: 'MIG-8091', source: 'MySQL', target: 'Snowflake', tables: 5, size: '1.8 GB', date: '2026-07-08 10:12', status: 'Success' },
-    { id: 'MIG-8090', source: 'MSSQL', target: 'Databricks', tables: 34, size: '840 GB', date: '2026-07-07 18:45', status: 'Failed', error: 'Lock timeout exceeded' },
-    { id: 'MIG-8089', source: 'Teradata', target: 'Databricks', tables: 12, size: '42 GB', date: '2026-07-07 11:30', status: 'Success' },
-  ]
 
   return (
     <main style={{ flex: 1, maxWidth: 1280, width: '100%', margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 32 }}>
@@ -82,25 +132,50 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentruns.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                      <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>{r.id}</td>
-                      <td style={{ padding: '12px 14px' }}>
-                        <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                          <strong>{r.source}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>→</span> <strong>{r.target}</strong>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-secondary)' }}>{r.tables} tables</td>
-                      <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-secondary)' }}>{r.size}</td>
-                      <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-muted)' }}>{r.date}</td>
-                      <td style={{ padding: '12px 14px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <Badge color={r.status === 'Success' ? 'green' : 'red'} size="sm">{r.status}</Badge>
-                          {r.error && <span style={{ fontSize: 9, color: 'var(--accent-red)' }}>{r.error}</span>}
-                        </div>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
+                        Loading recent migration runs...
                       </td>
                     </tr>
-                  ))}
+                  ) : runs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
+                        No migration runs found. Launch the Migration Wizard to start.
+                      </td>
+                    </tr>
+                  ) : (
+                    runs.map((r, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                        <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>
+                          {r.job_id.slice(0, 8).toUpperCase()}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                            <strong>{r.source}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>→</span> <strong>{r.target}</strong>
+                            {r.connection_name && (
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                                Profile: {r.connection_name}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-secondary)' }}>{r.tables} items</td>
+                        <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-secondary)' }}>{r.size || '—'}</td>
+                        <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-muted)' }}>
+                          {r.created_at ? new Date(r.created_at).toLocaleString() : '—'}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Badge color={r.status === 'Success' || r.status === 'COMPLETED' ? 'green' : r.status === 'Running' ? 'violet' : 'red'} size="sm">
+                              {r.status}
+                            </Badge>
+                            {r.error && <span style={{ fontSize: 9, color: 'var(--accent-red)' }}>{r.error}</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
