@@ -8,35 +8,37 @@ const DatastageForm = ({ values, onChange }) => {
         label="Host URL"
         value={values.host}
         onChange={v => onChange('host', v)}
-        placeholder="https://datastage-host.com"
+        placeholder="https://ca-tor.dai.cloud.ibm.com"
         required
       />
       <Field
         label="Username"
         value={values.username}
         onChange={v => onChange('username', v)}
-        placeholder="admin"
+        placeholder="mr.subhajitofficialmail@gmail.com"
         required
       />
       <Field
-        label="Password"
+        label="API Key"
         value={values.password}
         onChange={v => onChange('password', v)}
         password
         required
       />
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <Field
           label="Project Name"
-          value={values.database}
-          onChange={v => onChange('database', v)}
-          placeholder="default_project"
+          value={values.project_name}
+          onChange={v => onChange('project_name', v)}
+          placeholder="Subhajit's Sandbox Project"
+          required
         />
         <Field
-          label="Port"
-          value={values.port}
-          onChange={v => onChange('port', v)}
-          placeholder="443"
+          label="Project ID"
+          value={values.project_id}
+          onChange={v => onChange('project_id', v)}
+          placeholder="41001099-5063-403c-ac77-f22e32e77fe0"
+          required
         />
       </div>
     </>
