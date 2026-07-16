@@ -92,7 +92,7 @@ const LandingPage = ({ persona }) => {
           <Badge color="violet" size="lg" style={{ marginBottom: 24, fontSize: 12, padding: '4px 12px' }}>
             Next-Gen ETL Migration
           </Badge>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 45, fontWeight: 800, lineHeight: 1.5, marginBottom: 20 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 45, fontWeight: 800, lineHeight: 1.3, marginBottom: 20 }}>
             Automate Your Journey from <br />
             <span
               style={{
@@ -100,12 +100,11 @@ const LandingPage = ({ persona }) => {
                 transition: 'opacity 0.25s ease, transform 0.25s ease',
                 opacity: fade ? 1 : 0,
                 transform: fade ? 'translateY(0)' : 'translateY(-4px)',
-                display: 'inline-block',
-                minWidth: 160
+                display: 'inline-block'
               }}
             >
               {words[wordIndex]}
-            </span> to Modern Cloud
+            </span> <br /> to Modern Cloud
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 16, lineHeight: 1.6, marginBottom: 40, maxWidth: 600, margin: '0 auto 40px' }}>
             Seamlessly transition your legacy ETL workloads to Databricks and Snowflake with intelligent discovery, automated gap analysis, and optimized code conversion.
