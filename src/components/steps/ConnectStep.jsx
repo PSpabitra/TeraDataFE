@@ -173,23 +173,30 @@ const ConnectStep = () => {
 
         {/* Source Platform Toggle buttons */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          {Object.values(SOURCES).map(platform => (
-            <button
-              key={platform.id}
-              type="button"
-              onClick={() => handleSourcePlatformChange(platform.id)}
-              style={{
-                flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
-                background: src.platform === platform.id ? 'var(--bg-active)' : 'transparent',
-                borderColor: src.platform === platform.id ? 'var(--border-bright)' : 'var(--border-dim)',
-                color: src.platform === platform.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                fontFamily: 'var(--font-mono)', cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-            >
-              {platform.label}
-            </button>
-          ))}
+          {Object.values(SOURCES).map(platform => {
+            const isSelected = src.platform === platform.id;
+            const shouldBlur = srcLoading && !isSelected;
+            return (
+              <button
+                key={platform.id}
+                type="button"
+                onClick={shouldBlur ? undefined : () => handleSourcePlatformChange(platform.id)}
+                style={{
+                  flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
+                  background: isSelected ? 'var(--bg-active)' : 'transparent',
+                  borderColor: isSelected ? 'var(--border-bright)' : 'var(--border-dim)',
+                  color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontFamily: 'var(--font-mono)', 
+                  cursor: shouldBlur ? 'not-allowed' : 'pointer',
+                  opacity: shouldBlur ? 0.35 : 1,
+                  pointerEvents: shouldBlur ? 'none' : 'auto',
+                  transition: 'all 0.15s'
+                }}
+              >
+                {platform.label}
+              </button>
+            )
+          })}
         </div>
 
         {/* Render Source Connection Form dynamically */}
@@ -254,23 +261,30 @@ const ConnectStep = () => {
 
         {/* Target Platform Toggle buttons */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          {Object.values(TARGETS).map(platform => (
-            <button
-              key={platform.id}
-              type="button"
-              onClick={() => handlePlatformChange(platform.id)}
-              style={{
-                flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
-                background: tgt.platform === platform.id ? 'var(--bg-active)' : 'transparent',
-                borderColor: tgt.platform === platform.id ? 'var(--border-bright)' : 'var(--border-dim)',
-                color: tgt.platform === platform.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                fontFamily: 'var(--font-mono)', cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-            >
-              {platform.label}
-            </button>
-          ))}
+          {Object.values(TARGETS).map(platform => {
+            const isSelected = tgt.platform === platform.id;
+            const shouldBlur = tgtLoading && !isSelected;
+            return (
+              <button
+                key={platform.id}
+                type="button"
+                onClick={shouldBlur ? undefined : () => handlePlatformChange(platform.id)}
+                style={{
+                  flex: 1, padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid', fontSize: 11, fontWeight: 500,
+                  background: isSelected ? 'var(--bg-active)' : 'transparent',
+                  borderColor: isSelected ? 'var(--border-bright)' : 'var(--border-dim)',
+                  color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontFamily: 'var(--font-mono)',
+                  cursor: shouldBlur ? 'not-allowed' : 'pointer',
+                  opacity: shouldBlur ? 0.35 : 1,
+                  pointerEvents: shouldBlur ? 'none' : 'auto',
+                  transition: 'all 0.15s'
+                }}
+              >
+                {platform.label}
+              </button>
+            )
+          })}
         </div>
 
         {/* Render Target Connection Form dynamically */}
