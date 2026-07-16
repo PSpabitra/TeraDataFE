@@ -13,7 +13,7 @@ import { useMigration } from '../../context/MigrationContext'
  * @returns {React.ReactElement}
  */
 const ReplicateStep = () => {
-  const { send, selectedResources: selected, gapAnalysis, sourceResources, targetResources, srcCfg, tgtCfg, targetTypes, summary, setSummary, setStep } = useMigration()
+  const { send, selectedResources: selected, gapAnalysis, sourceResources, targetResources, srcCfg, tgtCfg, targetTypes, summary, setSummary, setStep, connectionName, replicationMode, persona } = useMigration()
   const onComplete = (s) => { setSummary(s); setStep(4) }
   const [events, setEvents] = useState([])
   const [started, setStarted] = useState(false)
@@ -46,9 +46,13 @@ const ReplicateStep = () => {
       })),
       source_platform: srcCfg?.platform || 'teradata',
       target_platform: tgtCfg?.platform || 'databricks',
-      gap_analysis: gapAnalysis?.gap_analysis || {}
+      gap_analysis: gapAnalysis?.gap_analysis || {},
+      connection_name: connectionName || 'default_connection',
+      replication_mode: replicationMode || 'create_and_insert',
+      persona_id: persona?.id
     })
   }
+
 
   const stepColor = {
     STARTED: '#38bdf8', ITEM_STARTED: '#8b5cf6', ITEM_COMPLETED: '#10b981',

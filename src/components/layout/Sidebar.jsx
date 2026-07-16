@@ -47,8 +47,8 @@ export default function Sidebar() {
           <Database size={16} style={{ color: '#fff' }} />
         </div>
         <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 800, letterSpacing: '0.04em', color: 'var(--text-primary)' }}>TeraData</div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>ETL Platform</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--text-primary)' }}>DMigrate</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>ETL Platform</div>
         </div>
       </div>
 

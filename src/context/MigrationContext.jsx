@@ -18,6 +18,8 @@ export function MigrationProvider({ children, initialPersona, onLogout }) {
   const [showLogs, setShowLogs] = useState(false)
   const [srcCfg, setSrcCfg] = useState({})
   const [tgtCfg, setTgtCfg] = useState({})
+  const [connectionName, setConnectionName] = useState('')
+  const [replicationMode, setReplicationMode] = useState('create_and_insert')
 
   const setPersona = (p) => {
     setPersonaState(p)
@@ -69,6 +71,8 @@ export function MigrationProvider({ children, initialPersona, onLogout }) {
     setGapAnalysis(null)
     setSummary(null)
     targetTypesRef.current = {}
+    setConnectionName('')
+    setReplicationMode('create_and_insert')
   }
 
   return (
@@ -99,6 +103,10 @@ export function MigrationProvider({ children, initialPersona, onLogout }) {
       setSrcCfg,
       tgtCfg,
       setTgtCfg,
+      connectionName,
+      setConnectionName,
+      replicationMode,
+      setReplicationMode,
       wsStatus,
       send: wrappedSend,
       restartMigration
@@ -107,6 +115,7 @@ export function MigrationProvider({ children, initialPersona, onLogout }) {
     </MigrationContext.Provider>
   )
 }
+
 
 export function useMigration() {
   const context = useContext(MigrationContext)

@@ -8,6 +8,7 @@
   --bg-card: #1a2235;
   --bg-hover: #1f2a3d;
   --bg-active: #243044;
+  --bg-header: rgba(13,17,23,0.85);
 
   --border-dim: rgba(99,130,190,0.12);
   --border-mid: rgba(99,130,190,0.22);
@@ -44,6 +45,37 @@
   --shadow-card: 0 4px 24px rgba(0,0,0,0.4);
   --shadow-glow: 0 0 20px rgba(56,189,248,0.1);
 }
+
+[data-theme='light'] {
+  --bg-void: #f3f4f6;
+  --bg-base: #ffffff;
+  --bg-surface: #f9fafb;
+  --bg-panel: #f3f4f6;
+  --bg-card: #ffffff;
+  --bg-hover: #e5e7eb;
+  --bg-active: #d1d5db;
+  --bg-header: rgba(255,255,255,0.85);
+
+  --border-dim: rgba(0,0,0,0.06);
+  --border-mid: rgba(0,0,0,0.12);
+  --border-bright: rgba(0,0,0,0.24);
+  --border-glow: rgba(56,189,248,0.5);
+
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --text-dim: #d1d5db;
+
+  --cyan-dim: rgba(56,189,248,0.12);
+  --green-dim: rgba(16,185,129,0.12);
+  --amber-dim: rgba(245,158,11,0.12);
+  --red-dim: rgba(239,68,68,0.12);
+  --violet-dim: rgba(139,92,246,0.12);
+
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.06);
+  --shadow-glow: 0 0 20px rgba(56,189,248,0.05);
+}
+
 
 html, body, #root {
   height: 100%;

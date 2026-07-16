@@ -1,12 +1,27 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { GitBranch, Play, ArrowRight, Search, Activity, Zap } from 'lucide-react'
+import { GitBranch, Play, ArrowRight, Search, Activity, Zap, Sun, Moon } from 'lucide-react'
 import Badge from '../components/common/Badge'
 import Btn from '../components/common/Btn'
 import Card from '../components/common/Card'
 
 const LandingPage = ({ persona }) => {
   const navigate = useNavigate()
+
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('tera_theme') || 'dark'
+    } catch {
+      return 'dark'
+    }
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    try {
+      localStorage.setItem('tera_theme', theme)
+    } catch {}
+  }, [theme])
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column' }}>
@@ -17,9 +32,36 @@ const LandingPage = ({ persona }) => {
           <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #38bdf8, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <GitBranch size={16} style={{ color: '#fff' }} />
           </div>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, letterSpacing: '0.04em' }}>TeraMigrate</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, letterSpacing: '0.04em' }}>DMigrate</span>
         </div>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <button
+            onClick={() => setTheme(p => p === 'dark' ? 'light' : 'dark')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              border: '1px solid transparent',
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              outline: 'none',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--bg-hover)'
+              e.currentTarget.style.color = 'var(--text-primary)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = 'var(--text-secondary)'
+            }}
+          >
+            {theme === 'dark' ? <Sun size={15} style={{ display: 'block' }} /> : <Moon size={15} style={{ display: 'block' }} />}
+          </button>
           {persona ? (
             <Btn variant="primary" onClick={() => navigate('/dashboard')}>Go to Dashboard</Btn>
           ) : (
@@ -36,10 +78,10 @@ const LandingPage = ({ persona }) => {
           </Badge>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
             Automate Your Journey from <br />
-            <span style={{ color: 'var(--accent-cyan)' }}>Teradata</span> to Modern Cloud
+            <span style={{ color: 'var(--accent-cyan)' }}>Database</span> to Modern Cloud
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 16, lineHeight: 1.6, marginBottom: 40, maxWidth: 600, margin: '0 auto 40px' }}>
-            Seamlessly transition your legacy ETL workloads to Databricks and Snowflake. AI-powered discovery, automated gap analysis, and intelligent code conversion.
+            Seamlessly transition your legacy ETL workloads to Databricks and Snowflake with intelligent discovery, automated gap analysis, and optimized code conversion.
           </p>
 
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
@@ -83,7 +125,7 @@ const LandingPage = ({ persona }) => {
 
       {/* Footer */}
       <footer style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 12, borderTop: '1px solid var(--border-dim)' }}>
-        &copy; {new Date().getFullYear()} TeraMigrate Platform. Designed for modern data teams.
+        &copy; {new Date().getFullYear()} DMigrate Platform. Designed for modern data teams.
       </footer>
     </div>
   )
