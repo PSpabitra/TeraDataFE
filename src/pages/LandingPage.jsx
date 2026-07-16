@@ -39,11 +39,63 @@ const LandingPage = ({ persona }) => {
     return () => clearInterval(interval)
   }, [])
 
+  // Generate random stars for the glittery background
+  const [stars, setStars] = useState([])
+  useEffect(() => {
+    const starCount = 80
+    const generated = Array.from({ length: starCount }).map((_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      size: Math.random() * 2 + 1, // 1px to 3px
+      color: ['#38bdf8', '#8b5cf6', '#ffffff', '#ffffff'][Math.floor(Math.random() * 4)],
+      delay: `${Math.random() * 5}s`,
+      duration: `${Math.random() * 3 + 2}s`
+    }))
+    setStars(generated)
+  }, [])
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+
+      {/* Nebula glowing gradients */}
+      <div style={{
+        position: 'absolute',
+        top: '25%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '600px',
+        height: '600px',
+        background: 'radial-gradient(circle, rgba(56,189,248,0.06) 0%, rgba(139,92,246,0.04) 50%, rgba(0,0,0,0) 100%)',
+        pointerEvents: 'none',
+        zIndex: 1,
+        filter: 'blur(80px)'
+      }} />
+
+      {/* Background Glitter Stars */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1, overflow: 'hidden' }}>
+        {stars.map((star) => (
+          <div
+            key={star.id}
+            className="glitter-star"
+            style={{
+              position: 'absolute',
+              left: star.left,
+              top: star.top,
+              width: star.size,
+              height: star.size,
+              borderRadius: '50%',
+              backgroundColor: star.color,
+              color: star.color,
+              '--delay': star.delay,
+              '--duration': star.duration
+            }}
+          />
+        ))}
+      </div>
 
       {/* Top Nav */}
-      <header style={{ padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-dim)' }}>
+      <header style={{ padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-dim)', position: 'relative', zIndex: 2 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #38bdf8, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <GitBranch size={16} style={{ color: '#fff' }} />
@@ -79,15 +131,15 @@ const LandingPage = ({ persona }) => {
             {theme === 'dark' ? <Sun size={15} style={{ display: 'block' }} /> : <Moon size={15} style={{ display: 'block' }} />}
           </button>
           {persona ? (
-            <Btn variant="primary" onClick={() => navigate('/dashboard')}>Go to Dashboard</Btn>
+            <Btn className="hover-card" variant="primary" onClick={() => navigate('/dashboard')}>Go to Dashboard</Btn>
           ) : (
-            <Btn variant="ghost" onClick={() => navigate('/login')}>Sign In</Btn>
+            <Btn className="hover-card" variant="ghost" onClick={() => navigate('/login')}>Sign In</Btn>
           )}
         </div>
       </header>
 
       {/* Hero Section */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 24px', textAlign: 'center' }}>
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 24px', textAlign: 'center', position: 'relative', zIndex: 2 }}>
         <div className="animate-fade" style={{ maxWidth: 800 }}>
           <Badge color="violet" size="lg" style={{ marginBottom: 24, fontSize: 12, padding: '4px 12px' }}>
             Next-Gen ETL Migration
@@ -112,11 +164,11 @@ const LandingPage = ({ persona }) => {
 
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
             {persona ? (
-              <Btn variant="primary" size="lg" icon={<Play size={16} />} onClick={() => navigate('/dashboard')} style={{ padding: '14px 32px', fontSize: 14 }}>
+              <Btn className="hover-card" variant="primary" size="lg" icon={<Play size={16} />} onClick={() => navigate('/dashboard')} style={{ padding: '14px 32px', fontSize: 14 }}>
                 Go to Dashboard ({persona.username})
               </Btn>
             ) : (
-              <Btn variant="primary" size="lg" icon={<ArrowRight size={16} />} onClick={() => navigate('/login')} style={{ padding: '14px 32px', fontSize: 14 }}>
+              <Btn className="hover-card" variant="primary" size="lg" icon={<ArrowRight size={16} />} onClick={() => navigate('/login')} style={{ padding: '14px 32px', fontSize: 14 }}>
                 Get Started
               </Btn>
             )}
@@ -150,7 +202,7 @@ const LandingPage = ({ persona }) => {
       </main>
 
       {/* Footer */}
-      <footer style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 12, borderTop: '1px solid var(--border-dim)' }}>
+      <footer style={{ padding: '24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 12, borderTop: '1px solid var(--border-dim)', position: 'relative', zIndex: 2 }}>
         &copy; {new Date().getFullYear()} DMigrate Platform. Designed for modern data teams.
       </footer>
     </div>

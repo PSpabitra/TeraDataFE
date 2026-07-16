@@ -1,6 +1,6 @@
 import React from 'react'
 
-const Btn = ({ children, onClick, variant = 'primary', disabled = false, size = 'md', icon, style }) => {
+const Btn = ({ children, onClick, variant = 'primary', disabled = false, size = 'md', icon, style, className, ...props }) => {
   const base = {
     display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid',
     borderRadius: 'var(--radius)', cursor: disabled ? 'not-allowed' : 'pointer',
@@ -17,7 +17,7 @@ const Btn = ({ children, onClick, variant = 'primary', disabled = false, size = 
     violet: { background: 'var(--violet-dim)', color: 'var(--accent-violet)', borderColor: 'rgba(139,92,246,0.3)' },
   }
   return (
-    <button onClick={!disabled ? onClick : undefined} style={{ ...base, ...variants[variant], ...style }}>
+    <button onClick={!disabled ? onClick : undefined} className={className} style={{ ...base, ...variants[variant], ...style }} {...props}>
       {icon && icon}{children}
     </button>
   )

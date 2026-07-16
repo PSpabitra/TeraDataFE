@@ -121,3 +121,20 @@ input, select, textarea { font-family: var(--font-mono); }
 .hover-card svg {
   transition: transform 0.3s ease !important;
 }
+
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+    box-shadow: 0 0 10px currentColor;
+  }
+}
+
+.glitter-star {
+  animation: twinkle var(--duration, 3s) infinite ease-in-out;
+  animation-delay: var(--delay, 0s);
+}
