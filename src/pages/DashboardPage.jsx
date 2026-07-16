@@ -211,7 +211,6 @@ export default function DashboardPage() {
                 </button>
               ))}
             </div>
-            </div>
           </Card>
 
           <Card glow>
