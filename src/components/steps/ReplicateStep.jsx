@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Check, X, Circle, Play, ChevronRight, Terminal, Activity, CheckCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Check, X, Circle, Play, ChevronRight, Terminal, Activity, CheckCircle, LayoutDashboard, ScrollText, RefreshCw } from 'lucide-react'
 import Btn from '../common/Btn'
 import Spinner from '../common/Spinner'
 import SectionTitle from '../common/SectionTitle'
@@ -15,6 +16,7 @@ import { useMigration } from '../../context/MigrationContext'
 const ReplicateStep = () => {
   const { send, selectedResources: selected, gapAnalysis, sourceResources, targetResources, srcCfg, tgtCfg, targetTypes, summary, setSummary, setStep, connectionName, replicationMode, persona } = useMigration()
   const onComplete = (s) => { setSummary(s); setStep(4) }
+  const navigate = useNavigate()
   const [events, setEvents] = useState([])
   const [started, setStarted] = useState(false)
   const [done, setDone] = useState(false)
@@ -193,6 +195,13 @@ const ReplicateStep = () => {
             <div style={{ marginTop: 12 }}>
               <Btn onClick={startReplication} variant="primary" size="lg" icon={<Play size={13} />}>
                 Start Migration
+              </Btn>
+            </div>
+          )}
+          {started && (
+            <div style={{ marginTop: 12 }}>
+              <Btn onClick={() => setStep(0)} variant="primary" size="lg" icon={<RefreshCw size={13} />}>
+                Go to Migration Wizard
               </Btn>
             </div>
           )}

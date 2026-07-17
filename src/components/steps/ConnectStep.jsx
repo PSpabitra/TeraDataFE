@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Database, Server, Cloud, AlertCircle, Check, ChevronRight, Edit2 } from 'lucide-react'
+import { Database, Server, Cloud, AlertCircle, Check, ChevronRight, Edit2, Play, RefreshCw } from 'lucide-react'
 import { getConnections, saveConnection, getMigrationConnections, saveMigrationConnection } from '../../api/connections'
+import { API } from '../../utils/constants'
 import Badge from '../common/Badge'
 import Spinner from '../common/Spinner'
 import Btn from '../common/Btn'
@@ -34,28 +35,102 @@ const ConnectStep = () => {
   const [profilesLoading, setProfilesLoading] = useState(false)
   const [saveLoading, setSaveLoading] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  const [runs, setRuns] = useState([])
 
   const srcRef = useRef(src)
   const tgtRef = useRef(tgt)
   useEffect(() => { srcRef.current = src; tgtRef.current = tgt }, [src, tgt])
 
-  const loadSavedProfiles = useCallback(() => {
+  const calculateRunProgress = (selectedItems, logEvents, isFinished) => {
+    if (isFinished) return 100
+    const itemNames = selectedItems && selectedItems.length > 0
+      ? selectedItems.map(item => item.name)
+      : Array.from(new Set(logEvents.map(e => e.item).filter(Boolean)))
+      
+    if (itemNames.length === 0) {
+      if (logEvents.some(e => e.status === 'STARTED' || e.step === 'STARTED')) return 10
+      return 0
+    }
+    
+    let totalProgress = 0
+    itemNames.forEach(name => {
+      const itemEvents = logEvents.filter(e => e.item === name)
+      const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.step === 'DATASET_SUCCESS' || e.step === 'PIPELINE_SUCCESS')
+      const failed = itemEvents.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED')
+      
+      if (finished || failed) {
+        totalProgress += 100
+        return
+      }
+      if (itemEvents.length === 0) return
+      
+      const batchEvt = itemEvents.filter(e => e.status === 'BATCH_LOADED' || e.step === 'BATCH_LOADED').slice(-1)[0]
+      if (batchEvt && batchEvt.progress_pct !== undefined) {
+        totalProgress += 40 + (batchEvt.progress_pct * 0.55)
+        return
+      }
+      
+      const hasMsg = (q) => itemEvents.some(e => e.message?.toLowerCase().includes(q.toLowerCase()))
+      if (hasMsg('Deployed') || hasMsg('Notebook')) {
+        totalProgress += 90
+      } else if (hasMsg('Deploying') || hasMsg('verification')) {
+        totalProgress += 70
+      } else if (hasMsg('Inserting') || hasMsg('Translating MySQL SQL query')) {
+        totalProgress += 45
+      } else if (hasMsg('Extracted') || hasMsg('Pipeline translated')) {
+        totalProgress += 30
+      } else if (hasMsg('Extracting') || hasMsg('Creating table')) {
+        totalProgress += 15
+      } else if (hasMsg('Translating')) {
+        totalProgress += 10
+      } else {
+        totalProgress += 5
+      }
+    })
+    
+    const pct = totalProgress / itemNames.length
+    return Math.min(Math.round(pct), 100)
+  }
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const loadSavedProfiles = useCallback((silent = false) => {
     if (persona?.id) {
-      setProfilesLoading(true)
+      if (!silent) setProfilesLoading(true)
+      else setIsRefreshing(true)
+      
       getMigrationConnections(persona.id)
         .then(data => {
           setSavedProfiles(data.connections || [])
+          
+          const runsUrl = persona?.id
+            ? `${API}/api/v1/replication/recent-runs?persona_id=${persona.id}`
+            : `${API}/api/v1/replication/recent-runs`
+          return fetch(runsUrl)
+        })
+        .then(res => res.json())
+        .then(data => {
+          setRuns(data.runs || [])
           setProfilesLoading(false)
+          setIsRefreshing(false)
         })
         .catch(err => {
-          console.error("Failed to load connection history:", err)
+          console.error("Failed to load connection history or runs:", err)
           setProfilesLoading(false)
+          setIsRefreshing(false)
         })
     }
   }, [persona?.id])
 
   useEffect(() => {
-    loadSavedProfiles()
+    loadSavedProfiles(false)
+    
+    // Auto-refresh the progress percentage every 5 seconds in background
+    const interval = setInterval(() => {
+      loadSavedProfiles(true)
+    }, 5000)
+    
+    return () => clearInterval(interval)
   }, [loadSavedProfiles])
 
   const loadProfileIntoWizard = (p) => {
@@ -65,6 +140,11 @@ const ConnectStep = () => {
     setTgt(p.target_config)
     setSrcResult({ status: 'connected', metadata: { loaded: true } })
     setTgtResult({ status: 'connected', metadata: { loaded: true } })
+  }
+
+  const executeProfile = (p) => {
+    loadProfileIntoWizard(p)
+    onComplete()
   }
 
   const handleSaveProfile = () => {
@@ -434,13 +514,9 @@ const ConnectStep = () => {
               <div style={{ color: 'var(--accent-red)', fontSize: 11 }}>{saveError}</div>
             )}
             
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
               <Btn onClick={handleSaveProfile} disabled={!connectionName || saveLoading} variant="violet" size="lg">
-                {saveLoading ? 'Saving Profile...' : 'Save Connection Profile'}
-              </Btn>
-              
-              <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
-                Proceed to Discovery
+                {saveLoading ? 'Saving Connection...' : 'Save Connection'}
               </Btn>
             </div>
           </div>
@@ -449,9 +525,30 @@ const ConnectStep = () => {
 
       {/* Connection History List */}
       <Card style={{ gridColumn: '1 / -1', marginTop: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 15 }}>
-          <Database size={16} style={{ color: 'var(--text-secondary)' }} />
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700 }}>Saved Connection Profiles</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Database size={16} style={{ color: 'var(--text-secondary)' }} />
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700 }}>Saved Connection Profiles</h2>
+          </div>
+          <button 
+            onClick={() => loadSavedProfiles(false)} 
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: 'var(--text-secondary)', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center',
+              padding: 4,
+              borderRadius: 4,
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            title="Refresh Statuses"
+          >
+            <RefreshCw size={14} className={profilesLoading || isRefreshing ? 'animate-spin' : ''} />
+          </button>
         </div>
         
         {profilesLoading ? (
@@ -467,7 +564,7 @@ const ConnectStep = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                  {['Profile Name', 'Source', 'Target', 'Default Mode', 'Created At', 'Action'].map(h => (
+                  {['Profile Name', 'Source', 'Target', 'Default Mode', 'Created At', 'Status', 'Action'].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                   ))}
                 </tr>
@@ -485,32 +582,84 @@ const ConnectStep = () => {
                     </td>
                     <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-muted)' }}>{new Date(p.created_at).toLocaleString()}</td>
                     <td style={{ padding: '12px 14px' }}>
-                      <button 
-                        onClick={() => loadProfileIntoWizard(p)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: 6,
-                          borderRadius: 4,
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'var(--bg-hover)'
-                          e.currentTarget.style.color = 'var(--accent-cyan)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'none'
-                          e.currentTarget.style.color = 'var(--text-secondary)'
-                        }}
-                        title="Edit Connection Profile"
-                      >
-                        <Edit2 size={14} />
-                      </button>
+                      {(() => {
+                        const profileRuns = runs.filter(r => r.connection_name === p.connection_name)
+                        const latestRun = profileRuns.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+                        
+                        if (!latestRun) {
+                          return <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>Not Run</span>
+                        }
+                        const isFinished = latestRun.status === 'Success' || latestRun.status === 'COMPLETED';
+                        const progress = calculateRunProgress(null, latestRun.logs || [], isFinished);
+                        const isFailed = latestRun.status === 'Failed';
+                        
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Badge color={isFinished ? 'green' : isFailed ? 'red' : 'amber'} size="sm">
+                              {isFinished ? 'Success' : isFailed ? 'Failed' : 'Running'}
+                            </Badge>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                              {progress}%
+                            </span>
+                          </div>
+                        )
+                      })()}
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button 
+                          onClick={() => executeProfile(p)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 6,
+                            borderRadius: 4,
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'var(--bg-hover)'
+                            e.currentTarget.style.color = 'var(--accent-green)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'none'
+                            e.currentTarget.style.color = 'var(--text-secondary)'
+                          }}
+                          title="Execute Profile (Proceed to Discovery)"
+                        >
+                          <Play size={14} />
+                        </button>
+                        <button 
+                          onClick={() => loadProfileIntoWizard(p)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 6,
+                            borderRadius: 4,
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'var(--bg-hover)'
+                            e.currentTarget.style.color = 'var(--accent-cyan)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'none'
+                            e.currentTarget.style.color = 'var(--text-secondary)'
+                          }}
+                          title="Edit Connection Profile"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
