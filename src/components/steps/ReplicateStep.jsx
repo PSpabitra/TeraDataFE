@@ -64,6 +64,66 @@ const ReplicateStep = () => {
     COMPLETED: <CheckCircle size={11} />, BATCH_LOADED: <Activity size={11} />
   }
 
+  const calculateRunProgress = (selectedItems, logEvents, isFinished) => {
+    if (isFinished) return 100
+    const itemNames = selectedItems && selectedItems.length > 0
+      ? selectedItems.map(item => item.name)
+      : Array.from(new Set(logEvents.map(e => e.item).filter(Boolean)))
+      
+    if (itemNames.length === 0) {
+      if (logEvents.some(e => e.status === 'STARTED' || e.step === 'STARTED')) return 10
+      return 0
+    }
+    
+    let totalProgress = 0
+    itemNames.forEach(name => {
+      const itemEvents = logEvents.filter(e => e.item === name)
+      const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.step === 'DATASET_SUCCESS' || e.step === 'PIPELINE_SUCCESS')
+      const failed = itemEvents.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED')
+      
+      if (finished || failed) {
+        totalProgress += 100
+        return
+      }
+      if (itemEvents.length === 0) return
+      
+      const batchEvt = itemEvents.filter(e => e.status === 'BATCH_LOADED' || e.step === 'BATCH_LOADED').slice(-1)[0]
+      if (batchEvt && batchEvt.progress_pct !== undefined) {
+        totalProgress += 40 + (batchEvt.progress_pct * 0.55)
+        return
+      }
+      
+      const hasMsg = (q) => itemEvents.some(e => e.message?.toLowerCase().includes(q.toLowerCase()))
+      if (hasMsg('Deployed') || hasMsg('Notebook')) {
+        totalProgress += 90
+      } else if (hasMsg('Deploying') || hasMsg('verification')) {
+        totalProgress += 70
+      } else if (hasMsg('Inserting') || hasMsg('Translating MySQL SQL query')) {
+        totalProgress += 45
+      } else if (hasMsg('Extracted') || hasMsg('Pipeline translated')) {
+        totalProgress += 30
+      } else if (hasMsg('Extracting') || hasMsg('Creating table')) {
+        totalProgress += 15
+      } else if (hasMsg('Translating')) {
+        totalProgress += 10
+      } else {
+        totalProgress += 5
+      }
+    })
+    
+    const pct = totalProgress / itemNames.length
+    return Math.min(Math.round(pct), 100)
+  }
+
+  const activeItem = selected.find(item => {
+    const itemEvents = events.filter(e => e.item === item.name)
+    const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.step === 'DATASET_SUCCESS' || e.step === 'PIPELINE_SUCCESS')
+    const failed = itemEvents.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED')
+    return started && !finished && !failed && itemEvents.length > 0
+  })
+
+  const activePct = calculateRunProgress(selected, events, done)
+
   return (
     <div className="animate-fade">
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20 }}>
@@ -73,12 +133,12 @@ const ReplicateStep = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 420, overflowY: 'auto' }}>
             {selected.map((item, i) => {
               const itemEvents = events.filter(e => e.item === item.name)
-              const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED')
-              const failed = itemEvents.some(e => e.status === 'ITEM_FAILED')
+              const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.step === 'DATASET_SUCCESS' || e.step === 'PIPELINE_SUCCESS')
+              const failed = itemEvents.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED')
               const running = started && !finished && !failed && itemEvents.length > 0
               const waiting = started && !finished && !failed && itemEvents.length === 0 && !done
 
-              const batchEvt = itemEvents.filter(e => e.status === 'BATCH_LOADED').slice(-1)[0]
+              const batchEvt = itemEvents.filter(e => e.status === 'BATCH_LOADED' || e.step === 'BATCH_LOADED').slice(-1)[0]
               const pct = batchEvt?.progress_pct
 
               return (
@@ -149,8 +209,8 @@ const ReplicateStep = () => {
 
                   const details = selected.map(item => {
                     const itemEvents = events.filter(e => e.item === item.name)
-                    const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.status === 'DATASET_SUCCESS' || e.status === 'PIPELINE_SUCCESS')
-                    const failed = itemEvents.some(e => e.status === 'ITEM_FAILED')
+                    const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.step === 'DATASET_SUCCESS' || e.step === 'PIPELINE_SUCCESS')
+                    const failed = itemEvents.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED')
                     const status = finished ? 'Success' : failed ? 'Failed' : 'Pending'
 
                     const totalRows = item.row_count || 0
@@ -208,23 +268,85 @@ const ReplicateStep = () => {
                 <span>Waiting to start...</span>
               </div>
             )}
+
             {events.map((evt, i) => {
               const color = stepColor[evt.status] || '#8ba3c7'
               const icon = stepIcon[evt.status]
               return (
-                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', animation: 'fade-in 0.2s ease forwards' }}>
-                  <span style={{ color: 'var(--text-dim)', fontSize: 10, flexShrink: 0, marginTop: 1 }}>{formatLocalTime(evt.timestamp)}</span>
-                  <span style={{ color, flexShrink: 0, marginTop: 1 }}>{icon || <ChevronRight size={10} />}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ color, fontWeight: 500 }}>{evt.status}</span>
-                    {evt.item && <span style={{ color: 'var(--text-secondary)', marginLeft: 8 }}>{evt.item}</span>}
-                    {evt.message && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>{evt.message}</span>}
-                    {evt.error && <div style={{ color: 'var(--accent-red)', fontSize: 10, marginTop: 2, wordBreak: 'break-all' }}>Error: {evt.error}</div>}
-                    {evt.detail && <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 2, wordBreak: 'break-all' }}>{evt.detail.slice(0, 120)}</div>}
+                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', flexDirection: 'column', animation: 'fade-in 0.2s ease forwards' }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <span style={{ color: 'var(--text-dim)', fontSize: 10, flexShrink: 0, marginTop: 1 }}>{formatLocalTime(evt.timestamp)}</span>
+                    <span style={{ color, flexShrink: 0, marginTop: 1 }}>{icon || <ChevronRight size={10} />}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ color, fontWeight: 500 }}>{evt.status}</span>
+                      {evt.item && <span style={{ color: 'var(--text-secondary)', marginLeft: 8 }}>{evt.item}</span>}
+                      {evt.message && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>{evt.message}</span>}
+                      {evt.error && <div style={{ color: 'var(--accent-red)', fontSize: 10, marginTop: 2, wordBreak: 'break-all' }}>Error: {evt.error}</div>}
+                      {evt.detail && <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 2, wordBreak: 'break-all' }}>{evt.detail.slice(0, 120)}</div>}
+                    </div>
                   </div>
+                  {(evt.status === 'BATCH_LOADED' || evt.step === 'BATCH_LOADED') && evt.progress_pct !== undefined && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 24, marginTop: 2, maxWidth: 300 }}>
+                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 4, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${evt.progress_pct}%`, background: 'var(--accent-cyan)', borderRadius: 2, transition: 'width 0.2s' }} />
+                      </div>
+                      <span style={{ fontSize: 9, color: 'var(--accent-cyan)', fontWeight: 600 }}>{evt.progress_pct}%</span>
+                    </div>
+                  )}
                 </div>
               )
             })}
+
+            {/* Custom loader at the very bottom of the log list */}
+            {started && (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '24px 0 12px 0',
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+                marginTop: 12,
+                gap: 8,
+                animation: 'fade-in 0.3s ease'
+              }}>
+                <div style={{ 
+                  fontFamily: 'sans-serif', 
+                  fontSize: 10, 
+                  fontWeight: 700, 
+                  letterSpacing: '0.1em', 
+                  color: done ? 'var(--accent-green)' : 'var(--text-secondary)' 
+                }}>
+                  {done ? 'MIGRATION COMPLETE' : 'REPLICATING DATABASE'}
+                </div>
+                <div style={{ 
+                  width: '80%', 
+                  maxWidth: 320, 
+                  background: 'rgba(255,255,255,0.05)', 
+                  borderRadius: 6, 
+                  height: 10, 
+                  border: '1px solid rgba(255,255,255,0.08)', 
+                  overflow: 'hidden' 
+                }}>
+                  <div style={{ 
+                    height: '100%', 
+                    width: `${activePct}%`, 
+                    background: done ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #38bdf8, #8b5cf6)', 
+                    borderRadius: 6, 
+                    transition: 'width 0.3s ease',
+                    boxShadow: done ? '0 0 8px rgba(16, 185, 129, 0.4)' : '0 0 8px rgba(56, 189, 248, 0.4)'
+                  }} />
+                </div>
+                <div style={{ 
+                  fontFamily: 'sans-serif', 
+                  fontSize: 10, 
+                  fontWeight: 600, 
+                  color: 'var(--text-muted)' 
+                }}>
+                  {activePct}%
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -13,6 +13,57 @@ export default function LogsPage() {
   const [selectedRun, setSelectedRun] = useState(null)
   const [expandedDdl, setExpandedDdl] = useState({})
 
+  const calculateRunProgress = (selectedItems, logEvents, isFinished) => {
+    if (isFinished) return 100
+    const itemNames = selectedItems && selectedItems.length > 0
+      ? selectedItems.map(item => item.name)
+      : Array.from(new Set(logEvents.map(e => e.item).filter(Boolean)))
+      
+    if (itemNames.length === 0) {
+      if (logEvents.some(e => e.status === 'STARTED' || e.step === 'STARTED')) return 10
+      return 0
+    }
+    
+    let totalProgress = 0
+    itemNames.forEach(name => {
+      const itemEvents = logEvents.filter(e => e.item === name)
+      const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.step === 'DATASET_SUCCESS' || e.step === 'PIPELINE_SUCCESS')
+      const failed = itemEvents.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED')
+      
+      if (finished || failed) {
+        totalProgress += 100
+        return
+      }
+      if (itemEvents.length === 0) return
+      
+      const batchEvt = itemEvents.filter(e => e.status === 'BATCH_LOADED' || e.step === 'BATCH_LOADED').slice(-1)[0]
+      if (batchEvt && batchEvt.progress_pct !== undefined) {
+        totalProgress += 40 + (batchEvt.progress_pct * 0.55)
+        return
+      }
+      
+      const hasMsg = (q) => itemEvents.some(e => e.message?.toLowerCase().includes(q.toLowerCase()))
+      if (hasMsg('Deployed') || hasMsg('Notebook')) {
+        totalProgress += 90
+      } else if (hasMsg('Deploying') || hasMsg('verification')) {
+        totalProgress += 70
+      } else if (hasMsg('Inserting') || hasMsg('Translating MySQL SQL query')) {
+        totalProgress += 45
+      } else if (hasMsg('Extracted') || hasMsg('Pipeline translated')) {
+        totalProgress += 30
+      } else if (hasMsg('Extracting') || hasMsg('Creating table')) {
+        totalProgress += 15
+      } else if (hasMsg('Translating')) {
+        totalProgress += 10
+      } else {
+        totalProgress += 5
+      }
+    })
+    
+    const pct = totalProgress / itemNames.length
+    return Math.min(Math.round(pct), 100)
+  }
+
   const fetchRuns = () => {
     setLoading(true)
     const url = persona?.id
@@ -300,6 +351,57 @@ export default function LogsPage() {
                       </div>
                     )
                   })
+                )}
+
+                {/* Historical Progress Loader at the bottom of log list */}
+                {selectedRun.logs && selectedRun.logs.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '24px 0 12px 0',
+                    borderTop: '1px solid #1e293b',
+                    marginTop: 16,
+                    gap: 8,
+                    animation: 'fade-in 0.3s ease'
+                  }}>
+                    <div style={{ 
+                      fontFamily: 'sans-serif', 
+                      fontSize: 10, 
+                      fontWeight: 700, 
+                      letterSpacing: '0.1em', 
+                      color: (selectedRun.status === 'Success' || selectedRun.status === 'COMPLETED') ? 'var(--accent-green)' : 'var(--accent-red)' 
+                    }}>
+                      {selectedRun.status === 'Success' || selectedRun.status === 'COMPLETED' ? 'MIGRATION COMPLETE' : 'MIGRATION RUN FAILED'}
+                    </div>
+                    <div style={{ 
+                      width: '80%', 
+                      maxWidth: 320, 
+                      background: 'rgba(255,255,255,0.05)', 
+                      borderRadius: 6, 
+                      height: 10, 
+                      border: '1px solid rgba(255,255,255,0.08)', 
+                      overflow: 'hidden' 
+                    }}>
+                      <div style={{ 
+                        height: '100%', 
+                        width: `${calculateRunProgress(null, selectedRun.logs, selectedRun.status === 'Success' || selectedRun.status === 'COMPLETED')}%`, 
+                        background: (selectedRun.status === 'Success' || selectedRun.status === 'COMPLETED') ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #ef4444, #f87171)', 
+                        borderRadius: 6, 
+                        transition: 'width 0.3s ease',
+                        boxShadow: (selectedRun.status === 'Success' || selectedRun.status === 'COMPLETED') ? '0 0 8px rgba(16, 185, 129, 0.4)' : '0 0 8px rgba(239, 68, 68, 0.4)'
+                      }} />
+                    </div>
+                    <div style={{ 
+                      fontFamily: 'sans-serif', 
+                      fontSize: 10, 
+                      fontWeight: 600, 
+                      color: 'var(--text-muted)' 
+                    }}>
+                      {calculateRunProgress(null, selectedRun.logs, selectedRun.status === 'Success' || selectedRun.status === 'COMPLETED')}%
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
