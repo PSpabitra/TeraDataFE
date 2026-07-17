@@ -10,10 +10,12 @@ import { SOURCES, TARGETS } from '../../config/platforms'
 import { useMigration } from '../../context/MigrationContext'
 
 const ALLOWED_TARGETS = {
-  datastage: ['databricks'],
-  teradata: ['databricks'],
-  mysql: ['databricks', 'sqlserver'],
-  mssql: ['databricks', 'mysql']
+  teradata: ['databricks', 'snowflake'],
+  mysql: ['databricks'],
+  mssql: ['databricks', 'mysql'],
+  postgres: ['databricks'],
+  datastage: ['adf'],
+  adf: ['databricks']
 }
 
 /**
@@ -46,30 +48,30 @@ const ConnectStep = () => {
     const itemNames = selectedItems && selectedItems.length > 0
       ? selectedItems.map(item => item.name)
       : Array.from(new Set(logEvents.map(e => e.item).filter(Boolean)))
-      
+
     if (itemNames.length === 0) {
       if (logEvents.some(e => e.status === 'STARTED' || e.step === 'STARTED')) return 10
       return 0
     }
-    
+
     let totalProgress = 0
     itemNames.forEach(name => {
       const itemEvents = logEvents.filter(e => e.item === name)
       const finished = itemEvents.some(e => e.status === 'ITEM_COMPLETED' || e.step === 'DATASET_SUCCESS' || e.step === 'PIPELINE_SUCCESS')
       const failed = itemEvents.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED')
-      
+
       if (finished || failed) {
         totalProgress += 100
         return
       }
       if (itemEvents.length === 0) return
-      
+
       const batchEvt = itemEvents.filter(e => e.status === 'BATCH_LOADED' || e.step === 'BATCH_LOADED').slice(-1)[0]
       if (batchEvt && batchEvt.progress_pct !== undefined) {
         totalProgress += 40 + (batchEvt.progress_pct * 0.55)
         return
       }
-      
+
       const hasMsg = (q) => itemEvents.some(e => e.message?.toLowerCase().includes(q.toLowerCase()))
       if (hasMsg('Deployed') || hasMsg('Notebook')) {
         totalProgress += 90
@@ -87,7 +89,7 @@ const ConnectStep = () => {
         totalProgress += 5
       }
     })
-    
+
     const pct = totalProgress / itemNames.length
     return Math.min(Math.round(pct), 100)
   }
@@ -98,11 +100,11 @@ const ConnectStep = () => {
     if (persona?.id) {
       if (!silent) setProfilesLoading(true)
       else setIsRefreshing(true)
-      
+
       getMigrationConnections(persona.id)
         .then(data => {
           setSavedProfiles(data.connections || [])
-          
+
           const runsUrl = persona?.id
             ? `${API}/api/v1/replication/recent-runs?persona_id=${persona.id}`
             : `${API}/api/v1/replication/recent-runs`
@@ -124,12 +126,12 @@ const ConnectStep = () => {
 
   useEffect(() => {
     loadSavedProfiles(false)
-    
+
     // Auto-refresh the progress percentage every 5 seconds in background
     const interval = setInterval(() => {
       loadSavedProfiles(true)
     }, 5000)
-    
+
     return () => clearInterval(interval)
   }, [loadSavedProfiles])
 
@@ -160,15 +162,15 @@ const ConnectStep = () => {
       target_config: tgt,
       replication_mode: replicationMode
     })
-    .then(() => {
-      setSaveLoading(false)
-      loadSavedProfiles()
-    })
-    .catch(err => {
-      console.error(err)
-      setSaveError(err.message || 'Failed to save connection profile')
-      setSaveLoading(false)
-    })
+      .then(() => {
+        setSaveLoading(false)
+        loadSavedProfiles()
+      })
+      .catch(err => {
+        console.error(err)
+        setSaveError(err.message || 'Failed to save connection profile')
+        setSaveLoading(false)
+      })
   }
 
 
@@ -339,7 +341,7 @@ const ConnectStep = () => {
                   background: isSelected ? 'var(--bg-active)' : 'transparent',
                   borderColor: isSelected ? 'var(--border-bright)' : 'var(--border-dim)',
                   color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  fontFamily: 'var(--font-mono)', 
+                  fontFamily: 'var(--font-mono)',
                   cursor: shouldBlur ? 'not-allowed' : 'pointer',
                   opacity: shouldBlur ? 0.35 : 1,
                   pointerEvents: shouldBlur ? 'none' : 'auto',
@@ -484,7 +486,7 @@ const ConnectStep = () => {
         <Card style={{ gridColumn: '1 / -1', padding: '20px 24px', border: '1px solid var(--border-glow)', marginTop: 10 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700 }}>Connection Profile & Replication Settings</h3>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Connection Profile Name *</label>
@@ -496,7 +498,7 @@ const ConnectStep = () => {
                   style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)', padding: '7px 11px', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }}
                 />
               </div>
-              
+
               <div>
                 <label style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Default Replication Mode *</label>
                 <select
@@ -509,17 +511,25 @@ const ConnectStep = () => {
                 </select>
               </div>
             </div>
-            
+
             {saveError && (
               <div style={{ color: 'var(--accent-red)', fontSize: 11 }}>{saveError}</div>
             )}
-            
+
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
               <Btn onClick={handleSaveProfile} disabled={!connectionName || saveLoading} variant="violet" size="lg">
                 {saveLoading ? 'Saving Connection...' : 'Save Connection'}
-              </Btn>
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 10 }}>
+                  <Btn onClick={handleSaveProfile} disabled={!connectionName || saveLoading} variant="violet" size="lg">
+                    {saveLoading ? 'Saving Profile...' : 'Save Connection Profile'}
+                  </Btn>
+
+                  <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
+                    Proceed to Discovery
+                  </Btn>
+                </div>
             </div>
-          </div>
         </Card>
       )}
 
@@ -530,14 +540,14 @@ const ConnectStep = () => {
             <Database size={16} style={{ color: 'var(--text-secondary)' }} />
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700 }}>Saved Connection Profiles</h2>
           </div>
-          <button 
-            onClick={() => loadSavedProfiles(false)} 
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: 'var(--text-secondary)', 
-              cursor: 'pointer', 
-              display: 'flex', 
+          <button
+            onClick={() => loadSavedProfiles(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
               alignItems: 'center',
               padding: 4,
               borderRadius: 4,
@@ -550,7 +560,7 @@ const ConnectStep = () => {
             <RefreshCw size={14} className={profilesLoading || isRefreshing ? 'animate-spin' : ''} />
           </button>
         </div>
-        
+
         {profilesLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
             <Spinner size={20} />
@@ -585,14 +595,14 @@ const ConnectStep = () => {
                       {(() => {
                         const profileRuns = runs.filter(r => r.connection_name === p.connection_name)
                         const latestRun = profileRuns.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-                        
+
                         if (!latestRun) {
                           return <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>Not Run</span>
                         }
                         const isFinished = latestRun.status === 'Success' || latestRun.status === 'COMPLETED';
                         const progress = calculateRunProgress(null, latestRun.logs || [], isFinished);
                         const isFailed = latestRun.status === 'Failed';
-                        
+
                         return (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Badge color={isFinished ? 'green' : isFailed ? 'red' : 'amber'} size="sm">
@@ -607,7 +617,7 @@ const ConnectStep = () => {
                     </td>
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button 
+                        <button
                           onClick={() => executeProfile(p)}
                           style={{
                             background: 'none',
@@ -633,7 +643,7 @@ const ConnectStep = () => {
                         >
                           <Play size={14} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => loadProfileIntoWizard(p)}
                           style={{
                             background: 'none',
