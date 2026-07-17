@@ -827,33 +827,13 @@ export default function LogsPage() {
                 </div>
               </div>
 
-              {/* Error info if failed */}
-              {log.error && (
-                <div style={{
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                  color: '#fca5a5',
-                  padding: 8,
-                  borderRadius: 4,
-                  marginTop: 4,
-                  fontSize: 11
-                }}>
-                  <strong>Error:</strong> {log.error}
-                </div>
-              )}
             </div>
-          )
-                  })
-                )}
-      </div>
-    </div>
-  ) : (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-muted)', gap: 12 }}>
-      <HelpCircle size={48} strokeWidth={1} />
-      <span>Select a migration run from the list to view its audit log.</span>
-    </div>
-  )
-}
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-muted)', gap: 12 }}>
+              <HelpCircle size={48} strokeWidth={1} />
+              <span>Select a migration run from the list to view its audit log.</span>
+            </div>
+          )}
         </Card >
       </div >
     </main >

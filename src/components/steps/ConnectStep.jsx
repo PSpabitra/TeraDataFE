@@ -516,20 +516,16 @@ const ConnectStep = () => {
               <div style={{ color: 'var(--accent-red)', fontSize: 11 }}>{saveError}</div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 10 }}>
               <Btn onClick={handleSaveProfile} disabled={!connectionName || saveLoading} variant="violet" size="lg">
                 {saveLoading ? 'Saving Connection...' : 'Save Connection'}
+              </Btn>
 
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 10 }}>
-                  <Btn onClick={handleSaveProfile} disabled={!connectionName || saveLoading} variant="violet" size="lg">
-                    {saveLoading ? 'Saving Profile...' : 'Save Connection Profile'}
-                  </Btn>
-
-                  <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
-                    Proceed to Discovery
-                  </Btn>
-                </div>
+              <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
+                Proceed to Discovery
+              </Btn>
             </div>
+          </div>
         </Card>
       )}
 
