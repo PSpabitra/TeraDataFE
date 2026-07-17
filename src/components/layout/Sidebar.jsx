@@ -1,6 +1,6 @@
 import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Database, GitBranch, LayoutDashboard, LogOut } from 'lucide-react'
+import { Database, GitBranch, LayoutDashboard, LogOut, ScrollText } from 'lucide-react'
 import { useMigration } from '../../context/MigrationContext'
 
 export default function Sidebar() {
@@ -11,6 +11,7 @@ export default function Sidebar() {
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={16} /> },
     { label: 'Migration Wizard', path: '/migration', icon: <GitBranch size={16} /> },
+    { label: 'Audit Logs', path: '/logs', icon: <ScrollText size={16} /> },
   ]
 
   const handleLogout = () => {

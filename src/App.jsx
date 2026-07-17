@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage.jsx'
 import MigrationApp from './pages/MigrationApp.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import DatastageMigrationPage from './pages/DatastageMigrationPage.jsx'
+import LogsPage from './pages/LogsPage.jsx'
 import AppLayout from './components/layout/AppLayout.jsx'
 import { MigrationProvider } from './context/MigrationContext.jsx'
 
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/migration" element={<MigrationApp />} />
         <Route path="/datastage-migration" element={<DatastageMigrationPage />} />
+        <Route path="/logs" element={<LogsPage />} />
       </Route>
     </Routes>
   )
