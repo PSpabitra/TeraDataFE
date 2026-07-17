@@ -11,10 +11,10 @@ import { useMigration } from '../../context/MigrationContext'
 
 const ALLOWED_TARGETS = {
   teradata: ['databricks', 'snowflake'],
-  mysql: ['databricks'],
+  mysql: ['sqlserver', 'databricks'],
   mssql: ['databricks', 'mysql'],
   postgres: ['databricks'],
-  datastage: ['adf'],
+  datastage: ['databricks', 'adf'],
   adf: ['databricks']
 }
 
