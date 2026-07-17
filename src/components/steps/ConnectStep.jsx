@@ -9,10 +9,12 @@ import { SOURCES, TARGETS } from '../../config/platforms'
 import { useMigration } from '../../context/MigrationContext'
 
 const ALLOWED_TARGETS = {
-  datastage: ['databricks'],
-  teradata: ['databricks'],
-  mysql: ['databricks', 'sqlserver'],
-  mssql: ['databricks', 'mysql']
+  teradata: ['databricks', 'snowflake'],
+  mysql: ['databricks'],
+  mssql: ['databricks', 'mysql'],
+  postgres: ['databricks'],
+  datastage: ['adf'],
+  adf: ['databricks']
 }
 
 /**
@@ -80,15 +82,15 @@ const ConnectStep = () => {
       target_config: tgt,
       replication_mode: replicationMode
     })
-    .then(() => {
-      setSaveLoading(false)
-      loadSavedProfiles()
-    })
-    .catch(err => {
-      console.error(err)
-      setSaveError(err.message || 'Failed to save connection profile')
-      setSaveLoading(false)
-    })
+      .then(() => {
+        setSaveLoading(false)
+        loadSavedProfiles()
+      })
+      .catch(err => {
+        console.error(err)
+        setSaveError(err.message || 'Failed to save connection profile')
+        setSaveLoading(false)
+      })
   }
 
 
@@ -259,7 +261,7 @@ const ConnectStep = () => {
                   background: isSelected ? 'var(--bg-active)' : 'transparent',
                   borderColor: isSelected ? 'var(--border-bright)' : 'var(--border-dim)',
                   color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  fontFamily: 'var(--font-mono)', 
+                  fontFamily: 'var(--font-mono)',
                   cursor: shouldBlur ? 'not-allowed' : 'pointer',
                   opacity: shouldBlur ? 0.35 : 1,
                   pointerEvents: shouldBlur ? 'none' : 'auto',
@@ -404,7 +406,7 @@ const ConnectStep = () => {
         <Card style={{ gridColumn: '1 / -1', padding: '20px 24px', border: '1px solid var(--border-glow)', marginTop: 10 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700 }}>Connection Profile & Replication Settings</h3>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Connection Profile Name *</label>
@@ -416,7 +418,7 @@ const ConnectStep = () => {
                   style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)', padding: '7px 11px', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }}
                 />
               </div>
-              
+
               <div>
                 <label style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Default Replication Mode *</label>
                 <select
@@ -429,16 +431,16 @@ const ConnectStep = () => {
                 </select>
               </div>
             </div>
-            
+
             {saveError && (
               <div style={{ color: 'var(--accent-red)', fontSize: 11 }}>{saveError}</div>
             )}
-            
+
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 10 }}>
               <Btn onClick={handleSaveProfile} disabled={!connectionName || saveLoading} variant="violet" size="lg">
                 {saveLoading ? 'Saving Profile...' : 'Save Connection Profile'}
               </Btn>
-              
+
               <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
                 Proceed to Discovery
               </Btn>
@@ -453,7 +455,7 @@ const ConnectStep = () => {
           <Database size={16} style={{ color: 'var(--text-secondary)' }} />
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700 }}>Saved Connection Profiles</h2>
         </div>
-        
+
         {profilesLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
             <Spinner size={20} />
