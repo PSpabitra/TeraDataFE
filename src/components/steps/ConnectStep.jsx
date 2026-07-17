@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Database, Server, Cloud, AlertCircle, Check, ChevronRight } from 'lucide-react'
+import { Database, Server, Cloud, AlertCircle, Check, ChevronRight, Edit2 } from 'lucide-react'
 import { getConnections, saveConnection, getMigrationConnections, saveMigrationConnection } from '../../api/connections'
 import Badge from '../common/Badge'
 import Spinner from '../common/Spinner'
@@ -485,7 +485,32 @@ const ConnectStep = () => {
                     </td>
                     <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-muted)' }}>{new Date(p.created_at).toLocaleString()}</td>
                     <td style={{ padding: '12px 14px' }}>
-                      <Btn onClick={() => loadProfileIntoWizard(p)} size="sm" variant="ghost">Load Config</Btn>
+                      <button 
+                        onClick={() => loadProfileIntoWizard(p)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 6,
+                          borderRadius: 4,
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'var(--bg-hover)'
+                          e.currentTarget.style.color = 'var(--accent-cyan)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'none'
+                          e.currentTarget.style.color = 'var(--text-secondary)'
+                        }}
+                        title="Edit Connection Profile"
+                      >
+                        <Edit2 size={14} />
+                      </button>
                     </td>
                   </tr>
                 ))}

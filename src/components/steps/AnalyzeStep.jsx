@@ -146,7 +146,7 @@ const AnalyzeStep = () => {
                   ['New Creates', gapAnalysis.gap_analysis?.new_creates || 0, 'cyan'],
                   ['Incremental', gapAnalysis.gap_analysis?.incremental_updates || 0, 'green'],
                   ['High Risk', gapAnalysis.gap_analysis?.high_risk_items || 0, 'red'],
-                  ['Total MB', Math.round(gapAnalysis.gap_analysis?.total_size_mb || 0), 'amber'],
+                  ['Total MB', (gapAnalysis.gap_analysis?.total_size_mb || 0).toFixed(2), 'amber'],
                 ].map(([l, v, c]) => (
                   <div key={l} style={{ padding: '10px 12px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)' }}>
                     <div style={{ fontSize: 18, fontWeight: 700, color: `var(--accent-${c})`, fontFamily: 'var(--font-display)' }}>{v}</div>
