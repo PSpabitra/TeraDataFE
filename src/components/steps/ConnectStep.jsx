@@ -521,9 +521,9 @@ const ConnectStep = () => {
                 {saveLoading ? 'Saving Connection...' : 'Save Connection'}
               </Btn>
 
-              <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
+              {/* <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
                 Proceed to Discovery
-              </Btn>
+              </Btn> */}
             </div>
           </div>
         </Card>

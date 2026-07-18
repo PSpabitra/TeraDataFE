@@ -736,9 +736,9 @@ export default function LogsPage() {
                   rel="noopener noreferrer"
                   style={{ textDecoration: 'none' }}
                 >
-                  <Btn variant="outline" size="sm" icon={<ExternalLink size={13} />}>
+                  {/* <Btn variant="outline" size="sm" icon={<ExternalLink size={13} />}>
                     Lineage Graph
-                  </Btn>
+                  </Btn> */}
                 </a>
               </div>
 
