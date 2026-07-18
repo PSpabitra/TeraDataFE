@@ -20,6 +20,7 @@ export function MigrationProvider({ children, initialPersona, onLogout }) {
   const [tgtCfg, setTgtCfg] = useState({})
   const [connectionName, setConnectionName] = useState('')
   const [replicationMode, setReplicationMode] = useState('create_and_insert')
+  const [viewingHistory, setViewingHistory] = useState(false)
 
   const setPersona = (p) => {
     setPersonaState(p)
@@ -73,6 +74,7 @@ export function MigrationProvider({ children, initialPersona, onLogout }) {
     targetTypesRef.current = {}
     setConnectionName('')
     setReplicationMode('create_and_insert')
+    setViewingHistory(false)
   }
 
   return (
@@ -107,6 +109,8 @@ export function MigrationProvider({ children, initialPersona, onLogout }) {
       setConnectionName,
       replicationMode,
       setReplicationMode,
+      viewingHistory,
+      setViewingHistory,
       wsStatus,
       send: wrappedSend,
       restartMigration

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Database, Server, Cloud, AlertCircle, Check, ChevronRight, Edit2, Play, RefreshCw } from 'lucide-react'
+import { Database, Server, Cloud, AlertCircle, Check, ChevronRight, Edit2, Play, RefreshCw, Eye } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { getConnections, saveConnection, getMigrationConnections, saveMigrationConnection } from '../../api/connections'
 import { API } from '../../utils/constants'
 import Badge from '../common/Badge'
@@ -23,7 +24,8 @@ const ALLOWED_TARGETS = {
  * @returns {React.ReactElement}
  */
 const ConnectStep = () => {
-  const { send, wsStatus, setStep, persona, connectionName, setConnectionName, replicationMode, setReplicationMode } = useMigration()
+  const { send, wsStatus, setStep, persona, connectionName, setConnectionName, replicationMode, setReplicationMode, setViewingHistory, setSrcCfg, setTgtCfg } = useMigration()
+  const navigate = useNavigate()
   const onComplete = () => setStep(1)
   const [src, setSrc] = useState({ platform: 'teradata', host: '', username: '', password: '', database: '', port: '1025' })
   const [tgt, setTgt] = useState({ platform: 'databricks', host: '', token: '', cluster_id: '', warehouse_id: '', username: '', password: '', database: '', schema: 'PUBLIC' })
@@ -43,13 +45,15 @@ const ConnectStep = () => {
   const tgtRef = useRef(tgt)
   useEffect(() => { srcRef.current = src; tgtRef.current = tgt }, [src, tgt])
 
-  const calculateRunProgress = (selectedItems, logEvents, isFinished) => {
+  const calculateRunProgress = (selectedItems, logEvents, isFinished, totalTablesCount) => {
     if (isFinished) return 100
     const itemNames = selectedItems && selectedItems.length > 0
       ? selectedItems.map(item => item.name)
       : Array.from(new Set(logEvents.map(e => e.item).filter(Boolean)))
 
-    if (itemNames.length === 0) {
+    const denominator = totalTablesCount || itemNames.length
+
+    if (denominator === 0) {
       if (logEvents.some(e => e.status === 'STARTED' || e.step === 'STARTED')) return 10
       return 0
     }
@@ -90,7 +94,7 @@ const ConnectStep = () => {
       }
     })
 
-    const pct = totalProgress / itemNames.length
+    const pct = totalProgress / denominator
     return Math.min(Math.round(pct), 100)
   }
 
@@ -140,6 +144,8 @@ const ConnectStep = () => {
     setReplicationMode(p.replication_mode)
     setSrc(p.source_config)
     setTgt(p.target_config)
+    setSrcCfg(p.source_config)
+    setTgtCfg(p.target_config)
     setSrcResult({ status: 'connected', metadata: { loaded: true } })
     setTgtResult({ status: 'connected', metadata: { loaded: true } })
   }
@@ -520,10 +526,6 @@ const ConnectStep = () => {
               <Btn onClick={handleSaveProfile} disabled={!connectionName || saveLoading} variant="violet" size="lg">
                 {saveLoading ? 'Saving Connection...' : 'Save Connection'}
               </Btn>
-
-              <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
-                Proceed to Discovery
-              </Btn>
             </div>
           </div>
         </Card>
@@ -570,23 +572,44 @@ const ConnectStep = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                  {['Profile Name', 'Source', 'Target', 'Default Mode', 'Created At', 'Status', 'Action'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  {['Profile Name', 'Source', 'Target', 'Default Mode', 'Created At', 'Status', 'Action'].map((h, i) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: 'left',
+                        padding: `10px ${i === 6 ? '0' : '14px'} 10px ${i === 0 ? '0' : '14px'}`,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {savedProfiles.map((p, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{p.connection_name}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{p.source_platform}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{p.target_platform}</td>
+                    <td style={{ padding: '12px 14px 12px 0', fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
+                      {p.connection_name}
+                    </td>
+                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                      {p.source_platform}
+                    </td>
+                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                      {p.target_platform}
+                    </td>
                     <td style={{ padding: '12px 14px' }}>
                       <Badge color={p.replication_mode === 'incremental_update' ? 'amber' : 'green'} size="sm">
                         {p.replication_mode === 'incremental_update' ? 'Incremental' : 'Create & Insert'}
                       </Badge>
                     </td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-muted)' }}>{new Date(p.created_at).toLocaleString()}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-muted)' }}>
+                      {new Date(p.created_at).toLocaleString()}
+                    </td>
                     <td style={{ padding: '12px 14px' }}>
                       {(() => {
                         const profileRuns = runs.filter(r => r.connection_name === p.connection_name)
@@ -595,9 +618,9 @@ const ConnectStep = () => {
                         if (!latestRun) {
                           return <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>Not Run</span>
                         }
-                        const isFinished = latestRun.status === 'Success' || latestRun.status === 'COMPLETED';
-                        const progress = calculateRunProgress(null, latestRun.logs || [], isFinished);
-                        const isFailed = latestRun.status === 'Failed';
+                        const isFinished = latestRun.status === 'Success' || latestRun.status === 'COMPLETED'
+                        const progress = calculateRunProgress(null, latestRun.logs || [], isFinished, latestRun.tables)
+                        const isFailed = latestRun.status === 'Failed'
 
                         return (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -611,8 +634,38 @@ const ConnectStep = () => {
                         )
                       })()}
                     </td>
-                    <td style={{ padding: '12px 14px' }}>
+                    <td style={{ padding: '12px 0 12px 14px' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => {
+                            loadProfileIntoWizard(p)
+                            setViewingHistory(true)
+                            setStep(3)
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 6,
+                            borderRadius: 4,
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'var(--bg-hover)'
+                            e.currentTarget.style.color = 'var(--accent-cyan)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'none'
+                            e.currentTarget.style.color = 'var(--text-secondary)'
+                          }}
+                          title="View Replication Logs"
+                        >
+                          <Eye size={14} />
+                        </button>
                         <button
                           onClick={() => executeProfile(p)}
                           style={{
@@ -635,7 +688,7 @@ const ConnectStep = () => {
                             e.currentTarget.style.background = 'none'
                             e.currentTarget.style.color = 'var(--text-secondary)'
                           }}
-                          title="Execute Profile (Proceed to Discovery)"
+                          title="Execute Profile"
                         >
                           <Play size={14} />
                         </button>

@@ -6,7 +6,7 @@ import { useMigration } from '../../context/MigrationContext'
 export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { setPersona } = useMigration()
+  const { setPersona, restartMigration } = useMigration()
 
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={16} /> },
@@ -60,7 +60,12 @@ export default function Sidebar() {
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                if (item.path === '/migration') {
+                  restartMigration()
+                }
+                navigate(item.path)
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',

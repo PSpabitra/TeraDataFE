@@ -217,6 +217,45 @@ function ItemGroup({ group, globalDdlState, onToggleDdl, defaultOpen = false }) 
 
   const statusColor = hasError ? '#ef4444' : hasSuccess ? '#34d399' : '#f59e0b'
 
+  const { sourceRows, targetRows } = useMemo(() => {
+    let sRows = 0
+    let tRows = 0
+
+    steps.forEach(s => {
+      const msg = s.message || ''
+      const batchMatch = msg.match(/(\d+)\/(\d+)\s+rows/)
+      if (batchMatch) {
+        tRows = Math.max(tRows, parseInt(batchMatch[1], 10))
+        sRows = Math.max(sRows, parseInt(batchMatch[2], 10))
+      }
+
+      const extractMatch = msg.match(/Extracted\s+(\d+)\s+rows/i)
+      if (extractMatch) {
+        sRows = Math.max(sRows, parseInt(extractMatch[1], 10))
+      }
+
+      const loadMatch = msg.match(/loaded\s+(\d+)\s+rows/i)
+      if (loadMatch) {
+        tRows = Math.max(tRows, parseInt(loadMatch[1], 10))
+      }
+
+      const insertMatch = msg.match(/Inserting\s+(\d+)\s+rows/i)
+      if (insertMatch) {
+        tRows = Math.max(tRows, parseInt(insertMatch[1], 10))
+      }
+    })
+
+    const isFinished = steps.some(s => {
+      const st = s.step || s.status || ''
+      return st.includes('SUCCESS') || st.includes('COMPLETED')
+    })
+    if (isFinished && tRows === 0 && sRows > 0) {
+      tRows = sRows
+    }
+
+    return { sourceRows: sRows, targetRows: tRows }
+  }, [steps])
+
   return (
     <div style={{
       border: `1px solid ${open ? 'rgba(56,189,248,0.25)' : '#1e293b'}`,
@@ -263,6 +302,24 @@ function ItemGroup({ group, globalDdlState, onToggleDdl, defaultOpen = false }) 
         }}>
           {itemName || '(meta)'}
         </span>
+
+        {/* Row count info */}
+        {(sourceRows > 0 || targetRows > 0) && (
+          <span style={{
+            fontSize: 10,
+            color: '#64748b',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            marginRight: 4
+          }}>
+            <span style={{ fontWeight: 600, color: '#38bdf8' }}>{targetRows.toLocaleString()}</span>
+            <span>/</span>
+            <span>{sourceRows.toLocaleString()} rows</span>
+          </span>
+        )}
 
         {/* Mode badge */}
         {mode && (
@@ -340,83 +397,230 @@ function MigrationSummary({ run, groups }) {
     modeCounts[mk] = (modeCounts[mk] || 0) + 1
   })
 
+  // Parse row counts for tables
+  let totalSourceRows = 0
+  let totalTargetRows = 0
+
+  groups.forEach(group => {
+    if (!group.itemName || group.type === 'pipeline' || (group.type || '').toLowerCase().includes('procedure')) return
+
+    let sRows = 0
+    let tRows = 0
+
+    group.steps.forEach(s => {
+      const msg = s.message || ''
+      const batchMatch = msg.match(/(\d+)\/(\d+)\s+rows/)
+      if (batchMatch) {
+        tRows = Math.max(tRows, parseInt(batchMatch[1], 10))
+        sRows = Math.max(sRows, parseInt(batchMatch[2], 10))
+      }
+
+      const extractMatch = msg.match(/Extracted\s+(\d+)\s+rows/i)
+      if (extractMatch) {
+        sRows = Math.max(sRows, parseInt(extractMatch[1], 10))
+      }
+
+      const loadMatch = msg.match(/loaded\s+(\d+)\s+rows/i)
+      if (loadMatch) {
+        tRows = Math.max(tRows, parseInt(loadMatch[1], 10))
+      }
+
+      const insertMatch = msg.match(/Inserting\s+(\d+)\s+rows/i)
+      if (insertMatch) {
+        tRows = Math.max(tRows, parseInt(insertMatch[1], 10))
+      }
+    })
+
+    const isFinished = group.steps.some(s => {
+      const st = s.step || s.status || ''
+      return st.includes('SUCCESS') || st.includes('COMPLETED')
+    })
+    if (isFinished && tRows === 0 && sRows > 0) {
+      tRows = sRows
+    }
+
+    totalSourceRows += sRows
+    totalTargetRows += tRows
+  })
+
+  const isSuccess = run.status === 'Success' || run.status === 'COMPLETED'
+  const isFailed = run.status === 'Failed'
+  const statusColor = isSuccess ? '#10b981' : isFailed ? '#ef4444' : '#f59e0b'
+  const statusBg = isSuccess ? 'rgba(16,185,129,0.06)' : isFailed ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)'
+
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(8,15,30,0.9) 100%)',
-      border: '1px solid rgba(56,189,248,0.2)',
-      borderRadius: 10,
-      padding: '16px 20px',
-      marginBottom: 4,
+      background: '#ffffff',
+      border: '1px solid var(--border-dim)',
+      borderRadius: 12,
+      padding: '20px 24px',
+      marginBottom: 16,
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 16,
+      flexWrap: 'wrap',
     }}>
-      {/* Source → Target row */}
+      {/* Source System node */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        marginBottom: 14,
-        flexWrap: 'wrap',
+        minWidth: 150
       }}>
         <div style={{
+          width: 44,
+          height: 44,
+          borderRadius: 10,
+          background: 'rgba(99, 102, 241, 0.06)',
+          border: '1px solid rgba(99, 102, 241, 0.15)',
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-          background: 'rgba(99,102,241,0.12)',
-          border: '1px solid rgba(99,102,241,0.25)',
-          borderRadius: 6,
-          padding: '6px 14px',
+          justifyContent: 'center',
+          flexShrink: 0
         }}>
-          <Database size={13} style={{ color: '#818cf8' }} />
-          <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 13, fontWeight: 700, color: '#c7d2fe' }}>
-            {run.source || '—'}
-          </span>
+          <Database size={20} style={{ color: '#4f46e5' }} />
         </div>
-
-        <ArrowRight size={18} style={{ color: '#38bdf8', flexShrink: 0 }} />
-
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          background: 'rgba(34,211,238,0.1)',
-          border: '1px solid rgba(34,211,238,0.25)',
-          borderRadius: 6,
-          padding: '6px 14px',
-        }}>
-          <Database size={13} style={{ color: '#22d3ee' }} />
-          <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 13, fontWeight: 700, color: '#a5f3fc' }}>
-            {run.target || '—'}
-          </span>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SOURCE DB</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>{run.source || '—'}</div>
         </div>
-
-        <Badge variant={getStatusBadgeVariant(run.status)} size="sm">
-          {run.status}
-        </Badge>
       </div>
 
-      {/* Stats grid */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-        {tables.length > 0 && (
-          <StatChip icon={<Table2 size={11} />} label="Tables" value={tables.length} color="#34d399" />
-        )}
-        {procs.length > 0 && (
-          <StatChip icon={<GitBranch size={11} />} label="SPs / Pipelines" value={procs.length} color="#a78bfa" />
-        )}
-        {Object.entries(modeCounts).map(([mk, count]) => {
-          const info = getModeInfo(mk)
-          const Icon = info.Icon
-          return (
+      {/* Pipeline / Connector */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        position: 'relative',
+        padding: '0 10px',
+        minWidth: 260
+      }}>
+        {/* Connecting line */}
+        <div style={{
+          width: '100%',
+          height: 3,
+          background: 'linear-gradient(90deg, #4f46e5, #0891b2)',
+          borderRadius: 2,
+          opacity: 0.12,
+          position: 'absolute',
+          top: 15,
+        }} />
+
+        {/* Graphical Arrow Indicator */}
+        <div style={{
+          position: 'absolute',
+          top: 15,
+          transform: 'translateY(-50%)',
+          background: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '50%',
+          width: 22,
+          height: 22,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+          color: '#64748b',
+          zIndex: 1
+        }}>
+          <ArrowRight size={11} />
+        </div>
+
+        {/* Info Badge */}
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 6,
+          justifyContent: 'center',
+          zIndex: 1,
+          marginTop: 28
+        }}>
+          {tables.length > 0 && (
+            <StatChip icon={<Table2 size={11} />} label="Tables" value={tables.length} color="#34d399" />
+          )}
+          {procs.length > 0 && (
+            <StatChip icon={<GitBranch size={11} />} label="SPs / Pipelines" value={procs.length} color="#a78bfa" />
+          )}
+          {Object.entries(modeCounts).map(([mk, count]) => {
+            const info = getModeInfo(mk)
+            const Icon = info.Icon
+            return (
+              <StatChip
+                key={mk}
+                icon={<Icon size={11} />}
+                label={info.label}
+                value={count}
+                color={info.color}
+              />
+            )
+          })}
+          {(totalSourceRows > 0 || totalTargetRows > 0) && (
             <StatChip
-              key={mk}
-              icon={<Icon size={11} />}
-              label={info.label}
-              value={count}
-              color={info.color}
+              icon={<Zap size={11} />}
+              label="Rows"
+              value={`${totalTargetRows.toLocaleString()} / ${totalSourceRows.toLocaleString()}`}
+              color="#38bdf8"
             />
-          )
-        })}
-        {run.size && (
-          <StatChip icon={<ScrollText size={11} />} label="Size" value={run.size} color="#f59e0b" />
-        )}
+          )}
+          {run.size && (
+            <StatChip icon={<ScrollText size={11} />} label="Size" value={run.size} color="#f59e0b" />
+          )}
+        </div>
+      </div>
+
+      {/* Target System node */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        minWidth: 150
+      }}>
+        <div style={{
+          width: 44,
+          height: 44,
+          borderRadius: 10,
+          background: 'rgba(6, 182, 212, 0.06)',
+          border: '1px solid rgba(6, 182, 212, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0
+        }}>
+          <Database size={20} style={{ color: '#0891b2' }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TARGET DB</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', textTransform: 'uppercase' }}>{run.target || '—'}</div>
+        </div>
+      </div>
+
+      {/* Status node */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        padding: '8px 16px',
+        background: statusBg,
+        border: `1px solid ${isSuccess ? 'rgba(16, 185, 129, 0.12)' : isFailed ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)'}`,
+        borderRadius: 8,
+        minWidth: 110,
+        alignSelf: 'stretch',
+      }}>
+        <span style={{ fontSize: 8, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>STATUS</span>
+        <span style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: statusColor,
+          textTransform: 'uppercase',
+          letterSpacing: '0.03em'
+        }}>
+          {run.status}
+        </span>
       </div>
     </div>
   )
@@ -736,9 +940,9 @@ export default function LogsPage() {
                   rel="noopener noreferrer"
                   style={{ textDecoration: 'none' }}
                 >
-                  <Btn variant="outline" size="sm" icon={<ExternalLink size={13} />}>
+                  {/* <Btn variant="outline" size="sm" icon={<ExternalLink size={13} />}>
                     Lineage Graph
-                  </Btn>
+                  </Btn> */}
                 </a>
               </div>
 
@@ -824,6 +1028,122 @@ export default function LogsPage() {
                       )
                     )
                   )}
+                </div>
+
+                {/* Progress bar section */}
+                {(() => {
+                  const isFinished = selectedRun.status === 'Success' || selectedRun.status === 'COMPLETED';
+                  const isFailed = selectedRun.status === 'Failed';
+                  const progress = calculateRunProgress(null, selectedRun.logs || [], isFinished, selectedRun.tables);
+
+                  let statusText = 'REPLICATING DATABASE';
+                  let barBackground = 'linear-gradient(90deg, #38bdf8, #8b5cf6)';
+                  let statusColor = 'var(--text-secondary)';
+                  let glowShadow = '0 0 8px rgba(56, 189, 248, 0.4)';
+
+                  if (isFinished) {
+                    statusText = 'MIGRATION COMPLETE';
+                    statusColor = 'var(--accent-green)';
+                    barBackground = 'linear-gradient(90deg, #10b981, #34d399)';
+                    glowShadow = '0 0 8px rgba(16, 185, 129, 0.4)';
+                  } else if (isFailed) {
+                    statusText = 'MIGRATION FAILED';
+                    statusColor = 'var(--accent-red)';
+                    barBackground = 'linear-gradient(90deg, #ef4444, #fca5a5)';
+                    glowShadow = '0 0 8px rgba(239, 68, 68, 0.4)';
+                  }
+
+                  return (
+                    <div style={{
+                      padding: '24px 0 12px 0',
+                      borderTop: '1px solid rgba(255,255,255,0.05)',
+                      marginTop: 12,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexShrink: 0,
+                    }}>
+                      <div style={{
+                        fontFamily: 'sans-serif',
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: '0.1em',
+                        color: statusColor,
+                      }}>
+                        {statusText}
+                      </div>
+
+                      <div style={{
+                        width: '80%',
+                        maxWidth: 320,
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: 6,
+                        height: 10,
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${progress}%`,
+                          background: barBackground,
+                          borderRadius: 6,
+                          transition: 'width 0.3s ease',
+                          boxShadow: glowShadow,
+                        }} />
+                      </div>
+
+                      <div style={{
+                        fontFamily: 'sans-serif',
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: 'var(--text-muted)',
+                      }}>
+                        {progress}%
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {/* Add to Knowledge Graph Action */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                background: 'rgba(56, 189, 248, 0.03)',
+                border: '1px dashed rgba(56, 189, 248, 0.2)',
+                borderRadius: 8,
+                marginTop: 4,
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Knowledge Graph
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                    Map and trace metadata lineage relationships for this run in the knowledge graph.
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {graphMessage && (
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: graphMessage.type === 'success' ? '#34d399' : '#ef4444',
+                    }}>
+                      {graphMessage.text}
+                    </span>
+                  )}
+                  {/* <Btn
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddToKnowledgeGraph}
+                    disabled={generatingGraph || selectedRun?.kg_generated === 1}
+                    icon={<GitBranch size={13} />}
+                  >
+                    {generatingGraph ? 'Adding...' : selectedRun?.kg_generated === 1 ? 'Added' : 'Add to Knowledge Graph'}
+                  </Btn> */}
                 </div>
               </div>
 

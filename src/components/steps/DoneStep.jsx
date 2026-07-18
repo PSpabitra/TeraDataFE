@@ -23,7 +23,7 @@ const DoneStep = () => {
       {summary && (
         <div style={{ display: 'flex', gap: 16, marginBottom: 32 }}>
           {[
-            ['Total Items', summary.total, 'cyan'],
+            ['Total Items', summary.total || summary.details?.length || ((summary.completed || 0) + (summary.failed || 0)) || 0, 'cyan'],
             ['Completed', summary.completed, 'green'],
             ['Failed', summary.failed, 'red'],
           ].map(([l, v, c]) => (
