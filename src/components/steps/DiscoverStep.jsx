@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Database, Cloud, RefreshCw, Table2, Workflow, Zap, Shield, Info, ChevronRight } from 'lucide-react'
+import { Database, Cloud, RefreshCw, Table2, Workflow, Zap, Shield, Info, ChevronRight, FileCode, Settings, Cpu } from 'lucide-react'
 import Badge from '../common/Badge'
 import Btn from '../common/Btn'
 import Card from '../common/Card'
@@ -7,6 +7,27 @@ import { SOURCES, TARGETS } from '../../config/platforms'
 
 
 import { useMigration } from '../../context/MigrationContext'
+
+const formatSize = (sizeMb) => {
+  if (sizeMb === undefined || sizeMb === null || sizeMb === 0) return '—'
+  if (sizeMb >= 1024) {
+    return `${(sizeMb / 1024).toFixed(2)}GB`
+  }
+  return `${Number(sizeMb).toFixed(2)}MB`
+}
+
+const formatTotalRows = (rows) => {
+  if (!rows && rows !== 0) return '—'
+  if (rows >= 1e6) return `${(rows / 1e6).toFixed(1)}M`
+  if (rows >= 1e3) return `${(rows / 1e3).toFixed(1)}K`
+  return rows.toLocaleString()
+}
+
+const getFormattedTotalSize = (resources) => {
+  if (!resources || !resources.datasets) return '—'
+  const totalMb = resources.datasets.reduce((sum, d) => sum + (d.size_mb || 0), 0)
+  return formatSize(totalMb)
+}
 
 /**
  * DiscoverStep component.
@@ -55,10 +76,13 @@ const DiscoverStep = () => {
     if (!resources) return null
     const datasets = resources.datasets || []
     const pipelines = resources.pipelines || []
+    const notebooks = resources.notebooks || []
+    const jobs = resources.jobs || []
+    const clusters = resources.clusters || []
     return (
-      <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {datasets.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
+          <div>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Table2 size={11} /> Datasets ({datasets.length})
             </div>
@@ -75,7 +99,7 @@ const DiscoverStep = () => {
                     <td style={{ padding: '6px 8px' }}><Badge color={d.type === 'VIEW' ? 'violet' : d.type === 'PROCEDURE' ? 'amber' : 'cyan'} size="sm">{d.type}</Badge></td>
                     <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{d.schema || d.catalog || '—'}</td>
                     <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{d.row_count?.toLocaleString() || '—'}</td>
-                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{d.size_mb ? `${d.size_mb}MB` : '—'}</td>
+                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)' }}>{formatSize(d.size_mb)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -99,6 +123,73 @@ const DiscoverStep = () => {
                     <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-primary)', fontWeight: 500 }}>{p.name}</td>
                     <td style={{ padding: '6px 8px', fontSize: 10, color: 'var(--text-secondary)' }}>{p.type}</td>
                     <td style={{ padding: '6px 8px' }}><Badge color={p.status === 'ACTIVE' || p.status === 'RUNNING' ? 'green' : 'gray'}>{p.status || '—'}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {notebooks.length > 0 && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <FileCode size={11} /> Notebooks ({notebooks.length})
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>{['Name', 'Path'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, fontWeight: 500, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)' }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {notebooks.map(n => (
+                  <tr key={n.id} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-primary)', fontWeight: 500 }}>{n.name}</td>
+                    <td style={{ padding: '6px 8px', fontSize: 10, color: 'var(--text-secondary)' }}>{n.path}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {jobs.length > 0 && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Settings size={11} /> Jobs/Workflows ({jobs.length})
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>{['Name', 'Creator'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, fontWeight: 500, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)' }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {jobs.map(j => (
+                  <tr key={j.id} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-primary)', fontWeight: 500 }}>{j.name}</td>
+                    <td style={{ padding: '6px 8px', fontSize: 10, color: 'var(--text-secondary)' }}>{j.creator || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {clusters.length > 0 && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Cpu size={11} /> Compute Clusters ({clusters.length})
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>{['Name', 'State', 'Node Type'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, fontWeight: 500, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)' }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {clusters.map(c => (
+                  <tr key={c.id} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                    <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-primary)', fontWeight: 500 }}>{c.name}</td>
+                    <td style={{ padding: '6px 8px' }}><Badge color={c.state === 'RUNNING' ? 'green' : 'gray'} size="sm">{c.state}</Badge></td>
+                    <td style={{ padding: '6px 8px', fontSize: 10, color: 'var(--text-secondary)' }}>{c.node_type || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -178,8 +269,8 @@ const DiscoverStep = () => {
                 <StatPill label="Datasets" value={srcResources.summary?.total_datasets || 0} color="cyan" />
                 <StatPill label="Pipelines" value={srcResources.summary?.total_pipelines || 0} color="violet" />
                 <StatPill label="Views" value={srcResources.summary?.total_views || 0} color="amber" />
-                <StatPill label="Size GB" value={srcResources.summary?.total_size_gb || 0} color="green" />
-                <StatPill label="Total Rows" value={((srcResources.datasets || []).reduce((s, d) => s + (d.row_count || 0), 0) / 1e6).toFixed(1) + 'M'} color="cyan" />
+                <StatPill label="Total Size" value={getFormattedTotalSize(srcResources)} color="green" />
+                <StatPill label="Total Rows" value={formatTotalRows((srcResources.datasets || []).reduce((s, d) => s + (d.row_count || 0), 0))} color="cyan" />
               </div>
               <ResourceTable resources={srcResources} />
               <InsightPanel insights={srcInsights} />
@@ -190,7 +281,7 @@ const DiscoverStep = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
                 <StatPill label="Datasets" value={tgtResources.summary?.total_datasets || 0} color="violet" />
                 <StatPill label="Pipelines" value={tgtResources.summary?.total_pipelines || 0} color="violet" />
-                <StatPill label="Size GB" value={tgtResources.summary?.total_size_gb || 0} color="green" />
+                <StatPill label="Total Size" value={getFormattedTotalSize(tgtResources)} color="green" />
                 <StatPill label="Notebooks" value={tgtResources.summary?.total_notebooks || 0} color="amber" />
               </div>
               <ResourceTable resources={tgtResources} />

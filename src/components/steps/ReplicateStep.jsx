@@ -177,6 +177,7 @@ const ReplicateStep = () => {
   })
 
   const activePct = calculateRunProgress(selected, events, done, selected?.length)
+  const hasFailed = summary?.failed > 0 || events.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED' || e.status === 'FAILED')
 
   return (
     <div className="animate-fade">
@@ -266,8 +267,25 @@ const ReplicateStep = () => {
             </div>
           )}
           {done && summary && (
-            <div style={{ marginTop: 12, padding: '12px', background: 'var(--green-dim)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 'var(--radius)' }}>
-              <div style={{ color: 'var(--accent-green)', fontWeight: 600, fontSize: 12, marginBottom: 6 }}><Check size={12} style={{ display: 'inline', marginRight: 5 }} />Migration Complete</div>
+            <div style={{
+              marginTop: 12,
+              padding: '12px',
+              background: hasFailed ? 'var(--red-dim)' : 'var(--green-dim)',
+              border: `1px solid ${hasFailed ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)'}`,
+              borderRadius: 'var(--radius)'
+            }}>
+              <div style={{
+                color: hasFailed ? 'var(--accent-red)' : 'var(--accent-green)',
+                fontWeight: 600,
+                fontSize: 12,
+                marginBottom: 6
+              }}>
+                {hasFailed ? (
+                  <><X size={12} style={{ display: 'inline', marginRight: 5 }} />Migration Completed with Errors</>
+                ) : (
+                  <><Check size={12} style={{ display: 'inline', marginRight: 5 }} />Migration Complete</>
+                )}
+              </div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
                 {summary.completed} completed · {summary.failed} failed
               </div>
@@ -282,9 +300,44 @@ const ReplicateStep = () => {
                     const failed = itemEvents.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED')
                     const status = finished ? 'Success' : failed ? 'Failed' : 'Pending'
 
-                    const totalRows = item.row_count || 0
-                    const inserted = finished ? totalRows : 0
-                    const failedRows = failed ? totalRows : 0
+                    // Parse row counts dynamically from event logs
+                    let sourceRows = item.row_count || 0
+                    let inserted = 0
+                    let failedRows = 0
+
+                    const messages = [...itemEvents].reverse().map(e => e.message || '').filter(Boolean)
+                    for (const msg of messages) {
+                      const extMatch = msg.match(/extracted\s+(\d+,?\d*)\s+rows/i)
+                      if (extMatch) {
+                        sourceRows = parseInt(extMatch[1].replace(/,/g, ''), 10)
+                        break
+                      }
+                    }
+
+                    let foundSync = false
+                    for (const msg of messages) {
+                      const syncMatch = msg.match(/successfully synced:\s*(\d+,?\d*)\s*inserted,\s*(\d+,?\d*)\s*updated/i)
+                      if (syncMatch) {
+                        const ins = parseInt(syncMatch[1].replace(/,/g, ''), 10)
+                        const upd = parseInt(syncMatch[2].replace(/,/g, ''), 10)
+                        inserted = ins + upd
+                        foundSync = true
+                        break
+                      }
+                      const reloadMatch = msg.match(/(?:reloaded|loaded)\s+(\d+,?\d*)\s+rows/i)
+                      if (reloadMatch) {
+                        inserted = parseInt(reloadMatch[1].replace(/,/g, ''), 10)
+                        foundSync = true
+                        break
+                      }
+                    }
+
+                    if (!foundSync && finished) {
+                      inserted = sourceRows
+                    }
+                    if (failed) {
+                      failedRows = sourceRows
+                    }
 
                     return {
                       name: item.name,
@@ -307,10 +360,8 @@ const ReplicateStep = () => {
                         return finalType;
                       })(),
                       sourceTable: srcPlatform,
-                      sourceRows: totalRows,
+                      sourceRows: sourceRows,
                       targetTable: tgtPlatform,
-
-                      // targetRows: inserted,
                       inserted: inserted,
                       failedRows: failedRows,
                       status: status
@@ -410,9 +461,9 @@ const ReplicateStep = () => {
                   fontSize: 10,
                   fontWeight: 700,
                   letterSpacing: '0.1em',
-                  color: done ? 'var(--accent-green)' : 'var(--text-secondary)'
+                  color: done ? (hasFailed ? 'var(--accent-red)' : 'var(--accent-green)') : 'var(--text-secondary)'
                 }}>
-                  {done ? 'MIGRATION COMPLETE' : 'REPLICATING DATABASE'}
+                  {done ? (hasFailed ? 'MIGRATION FAILED' : 'MIGRATION COMPLETE') : 'REPLICATING DATABASE'}
                 </div>
                 <div style={{
                   width: '80%',
@@ -426,10 +477,14 @@ const ReplicateStep = () => {
                   <div style={{
                     height: '100%',
                     width: `${activePct}%`,
-                    background: done ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #38bdf8, #8b5cf6)',
+                    background: done 
+                      ? (hasFailed ? 'linear-gradient(90deg, #ef4444, #f87171)' : 'linear-gradient(90deg, #10b981, #34d399)') 
+                      : 'linear-gradient(90deg, #38bdf8, #8b5cf6)',
                     borderRadius: 6,
                     transition: 'width 0.3s ease',
-                    boxShadow: done ? '0 0 8px rgba(16, 185, 129, 0.4)' : '0 0 8px rgba(56, 189, 248, 0.4)'
+                    boxShadow: done 
+                      ? (hasFailed ? '0 0 8px rgba(239, 68, 68, 0.4)' : '0 0 8px rgba(16, 185, 129, 0.4)') 
+                      : '0 0 8px rgba(56, 189, 248, 0.4)'
                   }} />
                 </div>
                 <div style={{

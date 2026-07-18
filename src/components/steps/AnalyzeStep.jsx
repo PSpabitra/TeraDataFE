@@ -14,10 +14,28 @@ import { TARGETS } from '../../config/platforms'
  */
 const AnalyzeStep = () => {
   const { send, sourceResources, targetResources, setStep, tgtCfg, setSelectedResources, gapAnalysis, setGapAnalysis, setTargetTypes: setContextTargetTypes } = useMigration()
-  const onComplete = (sel, gap, tt) => { setSelectedResources(sel); setGapAnalysis(gap); setContextTargetTypes(tt); setStep(3) }
   const [selected, setSelected] = useState([])
   const [localTargetTypes, setLocalTargetTypes] = useState({})
+  const [customPks, setCustomPks] = useState({})
   const [analyzing, setAnalyzing] = useState(false)
+
+  const onComplete = (sel, gap, tt) => {
+    const updatedSel = sel.map(item => {
+      if (item.kind === 'dataset' && item.columns) {
+        const currentPk = customPks[item.name] || item.columns.find(c => c.primary_key)?.name || item.columns[0]?.name || 'id';
+        const updatedCols = item.columns.map(c => ({
+          ...c,
+          primary_key: c.name === currentPk
+        }));
+        return { ...item, columns: updatedCols };
+      }
+      return item;
+    });
+    setSelectedResources(updatedSel);
+    setGapAnalysis(gap);
+    setContextTargetTypes(tt);
+    setStep(3);
+  }
 
   useEffect(() => {
     window.__insightHandler = (msg) => {
@@ -106,6 +124,27 @@ const AnalyzeStep = () => {
                           <option value="DATABRICKS_WORKFLOW">Pipeline (PySpark)</option>
                           <option value="DATABRICKS_SQL_SP">Stored Procedure (SQL)</option>
                         </select>
+                      )}
+                      {sel && item.kind === 'dataset' && item.columns && item.columns.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                          <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>PK:</span>
+                          <select 
+                            value={customPks[item.name] || item.columns.find(c => c.primary_key)?.name || item.columns[0]?.name || 'id'}
+                            onChange={(e) => { 
+                              setCustomPks(p => ({...p, [item.name]: e.target.value})) 
+                            }}
+                            style={{
+                              background: 'var(--bg-void)', border: '1px solid var(--border-dim)', borderRadius: 4,
+                              color: 'var(--accent-cyan)', fontSize: 9, padding: '2px 4px', outline: 'none', fontWeight: 600
+                            }}
+                          >
+                            {item.columns.map(col => (
+                              <option key={col.name} value={col.name}>
+                                {col.name} {col.primary_key ? '(🔑 DB Key)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       )}
                     </div>
                   </div>

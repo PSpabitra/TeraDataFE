@@ -526,10 +526,6 @@ const ConnectStep = () => {
               <Btn onClick={handleSaveProfile} disabled={!connectionName || saveLoading} variant="violet" size="lg">
                 {saveLoading ? 'Saving Connection...' : 'Save Connection'}
               </Btn>
-
-              <Btn onClick={onComplete} variant="primary" size="lg" icon={<ChevronRight size={15} />}>
-                Proceed to Discovery
-              </Btn>
             </div>
           </div>
         </Card>
