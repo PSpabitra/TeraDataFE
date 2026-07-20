@@ -31,6 +31,18 @@ const DatabricksForm = ({ values, onChange }) => {
         onChange={v => onChange('warehouse_id', v)}
         placeholder="abc123def"
       />
+      <Field
+        label="Catalog"
+        value={values.database}
+        onChange={v => onChange('database', v)}
+        placeholder="workspace"
+      />
+      <Field
+        label="Schema"
+        value={values.schema}
+        onChange={v => onChange('schema', v)}
+        placeholder="default"
+      />
     </>
   )
 }
