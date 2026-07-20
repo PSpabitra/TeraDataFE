@@ -112,10 +112,10 @@ const AnalyzeStep = () => {
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span>{item.schema || item.type} {item.row_count ? `· ${item.row_count.toLocaleString()} rows` : ''}</span>
                       {sel && (item.type === 'PROCEDURE' || item.type === 'STORED_PROCEDURE') && TARGETS[tgtCfg?.platform]?.supportsProcedureTransformation && (
-                        <select 
+                        <select
                           value={localTargetTypes[item.name] || 'DATABRICKS_WORKFLOW'}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => { e.stopPropagation(); setLocalTargetTypes(p => ({...p, [item.name]: e.target.value})) }}
+                          onChange={(e) => { e.stopPropagation(); setLocalTargetTypes(p => ({ ...p, [item.name]: e.target.value })) }}
                           style={{
                             background: 'var(--bg-void)', border: '1px solid var(--border-dim)', borderRadius: 4,
                             color: 'var(--text-secondary)', fontSize: 9, padding: '2px 4px', outline: 'none'
@@ -175,7 +175,7 @@ const AnalyzeStep = () => {
           {analyzing && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 300, gap: 12 }}>
               <Spinner size={24} />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Running AI gap analysis via Mistral...</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Running gap analysis...</span>
             </div>
           )}
           {gapAnalysis && (
