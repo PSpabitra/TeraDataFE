@@ -17,6 +17,12 @@ export default function DashboardPage() {
   const [runs, setRuns] = useState([])
   const [loading, setLoading] = useState(true)
 
+  const [currentPage, setCurrentPage] = useState(1)
+  const rowsPerPage = 10
+  const totalPages = Math.ceil(runs.length / rowsPerPage)
+  const validCurrentPage = Math.min(currentPage, Math.max(1, totalPages))
+  const currentRuns = runs.slice((validCurrentPage - 1) * rowsPerPage, validCurrentPage * rowsPerPage)
+
   useEffect(() => {
     const url = persona?.id
       ? `${API}/api/v1/replication/recent-runs?persona_id=${persona.id}`
@@ -146,7 +152,7 @@ export default function DashboardPage() {
                     </td>
                   </tr>
                 ) : (
-                  runs.map((r, i) => (
+                  currentRuns.map((r, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
                       <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>
                         {r.job_id.slice(0, 8).toUpperCase()}
@@ -180,6 +186,51 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
+          {!loading && totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderTop: '1px solid var(--border-dim)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Showing {(validCurrentPage - 1) * rowsPerPage + 1} to {Math.min(validCurrentPage * rowsPerPage, runs.length)} of {runs.length} entries
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  disabled={validCurrentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  style={{
+                    background: validCurrentPage === 1 ? 'var(--bg-surface)' : 'var(--bg-active)',
+                    border: '1px solid var(--border-dim)',
+                    color: validCurrentPage === 1 ? 'var(--text-dim)' : 'var(--text-primary)',
+                    padding: '4px 10px',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    cursor: validCurrentPage === 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => { if (validCurrentPage !== 1) e.currentTarget.style.background = 'var(--bg-hover)' }}
+                  onMouseLeave={(e) => { if (validCurrentPage !== 1) e.currentTarget.style.background = 'var(--bg-active)' }}
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={validCurrentPage === totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  style={{
+                    background: validCurrentPage === totalPages ? 'var(--bg-surface)' : 'var(--bg-active)',
+                    border: '1px solid var(--border-dim)',
+                    color: validCurrentPage === totalPages ? 'var(--text-dim)' : 'var(--text-primary)',
+                    padding: '4px 10px',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    cursor: validCurrentPage === totalPages ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => { if (validCurrentPage !== totalPages) e.currentTarget.style.background = 'var(--bg-hover)' }}
+                  onMouseLeave={(e) => { if (validCurrentPage !== totalPages) e.currentTarget.style.background = 'var(--bg-active)' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Quick Actions & Agents */}
