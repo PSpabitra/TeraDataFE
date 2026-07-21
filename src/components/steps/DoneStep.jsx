@@ -45,29 +45,47 @@ const DoneStep = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Table', 'Type', 'Source', 'Target', 'Source Rows', 'Inserted', 'Failed', 'Status'].map(h => (
+                  {['Table', 'Type', 'Source', 'Target', 'Source Rows', 'Sync Action / Breakdown', 'Failed', 'Status'].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '10px 20px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {summary.details.map((d, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</td>
-                    <td style={{ padding: '12px 20px' }}>
-                      <Badge color={(d.type === 'pipeline' || d.type === 'SP') ? 'violet' : 'cyan'} size="sm">{d.type?.toUpperCase()}</Badge>
-                    </td>
-                    <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.sourceTable}</td>
-                    <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.targetTable}</td>
+                {summary.details.map((d, i) => {
+                  const hasBreakdown = (d.insCount > 0 || d.updCount > 0 || d.delCount > 0 || d.uncCount > 0)
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</td>
+                      <td style={{ padding: '12px 20px' }}>
+                        <Badge color={(d.type === 'pipeline' || d.type === 'SP') ? 'violet' : 'cyan'} size="sm">{d.type?.toUpperCase()}</Badge>
+                      </td>
+                      <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.sourceTable}</td>
+                      <td style={{ padding: '12px 20px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{d.targetTable}</td>
 
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{(d.type !== 'pipeline' && d.type !== 'SP') ? d.sourceRows?.toLocaleString() : '—'}</td>
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{(d.type !== 'pipeline' && d.type !== 'SP') ? d.inserted?.toLocaleString() : '—'}</td>
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: d.failedRows > 0 ? 'var(--accent-red)' : 'var(--text-dim)', fontWeight: 500 }}>{(d.type !== 'pipeline' && d.type !== 'SP') ? d.failedRows?.toLocaleString() : '—'}</td>
-                    <td style={{ padding: '12px 20px' }}>
-                      <Badge color={d.status === 'Success' ? 'green' : d.status === 'Failed' ? 'red' : 'amber'} size="sm">{d.status}</Badge>
-                    </td>
-                  </tr>
-                ))}
+                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>{(d.type !== 'pipeline' && d.type !== 'SP') ? d.sourceRows?.toLocaleString() : '—'}</td>
+                      
+                      <td style={{ padding: '12px 20px', fontSize: 12 }}>
+                        {(d.type !== 'pipeline' && d.type !== 'SP') ? (
+                          hasBreakdown ? (
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                              {d.insCount > 0 && <Badge color="green" size="sm">🟢 {d.insCount.toLocaleString()} Inserted</Badge>}
+                              {d.updCount > 0 && <Badge color="amber" size="sm">🟡 {d.updCount.toLocaleString()} Updated</Badge>}
+                              {d.delCount > 0 && <Badge color="red" size="sm">🔴 {d.delCount.toLocaleString()} Deleted</Badge>}
+                              {d.uncCount > 0 && <Badge color="cyan" size="sm">🔵 {d.uncCount.toLocaleString()} Unchanged</Badge>}
+                            </div>
+                          ) : (
+                            <Badge color="green" size="sm">🟢 {(d.inserted || 0).toLocaleString()} Inserted</Badge>
+                          )
+                        ) : '—'}
+                      </td>
+
+                      <td style={{ padding: '12px 20px', fontSize: 12, color: d.failedRows > 0 ? 'var(--accent-red)' : 'var(--text-dim)', fontWeight: 500 }}>{(d.type !== 'pipeline' && d.type !== 'SP') ? d.failedRows?.toLocaleString() : '—'}</td>
+                      <td style={{ padding: '12px 20px' }}>
+                        <Badge color={d.status === 'Success' ? 'green' : d.status === 'Failed' ? 'red' : 'amber'} size="sm">{d.status}</Badge>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

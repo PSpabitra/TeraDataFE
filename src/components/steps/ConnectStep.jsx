@@ -11,7 +11,7 @@ import { SOURCES, TARGETS } from '../../config/platforms'
 import { useMigration } from '../../context/MigrationContext'
 
 const ALLOWED_TARGETS = {
-  teradata: ['databricks', 'snowflake'],
+  teradata: ['databricks'],
   mysql: ['sqlserver', 'databricks'],
   mssql: ['databricks', 'mysql'],
   postgres: ['databricks'],
@@ -578,162 +578,162 @@ const ConnectStep = () => {
         ) : (
           <>
             <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                  {['Profile Name', 'Source', 'Target', 'Default Mode', 'Created At', 'Status', 'Action'].map((h, i) => (
-                    <th
-                      key={h}
-                      style={{
-                        textAlign: 'left',
-                        padding: `10px ${i === 6 ? '0' : '14px'} 10px ${i === 0 ? '0' : '14px'}`,
-                        fontSize: 10,
-                        fontWeight: 600,
-                        color: 'var(--text-muted)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {currentProfiles.map((p, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                    <td style={{ padding: '12px 14px 12px 0', fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
-                      {p.connection_name}
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
-                      {p.source_platform}
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
-                      {p.target_platform}
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <Badge color={p.replication_mode === 'incremental_update' ? 'amber' : 'green'} size="sm">
-                        {p.replication_mode === 'incremental_update' ? 'Incremental' : 'Create & Insert'}
-                      </Badge>
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-muted)' }}>
-                      {new Date(p.created_at).toLocaleString()}
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      {(() => {
-                        const profileRuns = runs.filter(r => r.connection_name === p.connection_name)
-                        const latestRun = profileRuns.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-
-                        if (!latestRun) {
-                          return <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>Not Run</span>
-                        }
-                        const isFinished = latestRun.status === 'Success' || latestRun.status === 'COMPLETED'
-                        const progress = calculateRunProgress(null, latestRun.logs || [], isFinished, latestRun.tables)
-                        const isFailed = latestRun.status === 'Failed'
-
-                        return (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Badge color={isFinished ? 'green' : isFailed ? 'red' : 'amber'} size="sm">
-                              {isFinished ? 'Success' : isFailed ? 'Failed' : 'Running'}
-                            </Badge>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                              {progress}%
-                            </span>
-                          </div>
-                        )
-                      })()}
-                    </td>
-                    <td style={{ padding: '12px 0 12px 14px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          onClick={() => {
-                            loadProfileIntoWizard(p)
-                            setViewingHistory(true)
-                            setStep(3)
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: 6,
-                            borderRadius: 4,
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'var(--bg-hover)'
-                            e.currentTarget.style.color = 'var(--accent-cyan)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'none'
-                            e.currentTarget.style.color = 'var(--text-secondary)'
-                          }}
-                          title="View Replication Logs"
-                        >
-                          <Eye size={14} />
-                        </button>
-                        <button
-                          onClick={() => executeProfile(p)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: 6,
-                            borderRadius: 4,
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'var(--bg-hover)'
-                            e.currentTarget.style.color = 'var(--accent-green)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'none'
-                            e.currentTarget.style.color = 'var(--text-secondary)'
-                          }}
-                          title="Execute Profile"
-                        >
-                          <Play size={14} />
-                        </button>
-                        <button
-                          onClick={() => loadProfileIntoWizard(p)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: 6,
-                            borderRadius: 4,
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'var(--bg-hover)'
-                            e.currentTarget.style.color = 'var(--accent-cyan)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'none'
-                            e.currentTarget.style.color = 'var(--text-secondary)'
-                          }}
-                          title="Edit Connection Profile"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                      </div>
-                    </td>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                    {['Profile Name', 'Source', 'Target', 'Default Mode', 'Created At', 'Status', 'Action'].map((h, i) => (
+                      <th
+                        key={h}
+                        style={{
+                          textAlign: 'left',
+                          padding: `10px ${i === 6 ? '0' : '14px'} 10px ${i === 0 ? '0' : '14px'}`,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: 'var(--text-muted)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {currentProfiles.map((p, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                      <td style={{ padding: '12px 14px 12px 0', fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {p.connection_name}
+                      </td>
+                      <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                        {p.source_platform}
+                      </td>
+                      <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                        {p.target_platform}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <Badge color={p.replication_mode === 'incremental_update' ? 'amber' : 'green'} size="sm">
+                          {p.replication_mode === 'incremental_update' ? 'Incremental' : 'Create & Insert'}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: '12px 14px', fontSize: 11, color: 'var(--text-muted)' }}>
+                        {new Date(p.created_at).toLocaleString()}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        {(() => {
+                          const profileRuns = runs.filter(r => r.connection_name === p.connection_name)
+                          const latestRun = profileRuns.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+
+                          if (!latestRun) {
+                            return <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>Not Run</span>
+                          }
+                          const isFinished = latestRun.status === 'Success' || latestRun.status === 'COMPLETED'
+                          const progress = calculateRunProgress(null, latestRun.logs || [], isFinished, latestRun.tables)
+                          const isFailed = latestRun.status === 'Failed'
+
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Badge color={isFinished ? 'green' : isFailed ? 'red' : 'amber'} size="sm">
+                                {isFinished ? 'Success' : isFailed ? 'Failed' : 'Running'}
+                              </Badge>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                {progress}%
+                              </span>
+                            </div>
+                          )
+                        })()}
+                      </td>
+                      <td style={{ padding: '12px 0 12px 14px' }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => {
+                              loadProfileIntoWizard(p)
+                              setViewingHistory(true)
+                              setStep(3)
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 6,
+                              borderRadius: 4,
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--bg-hover)'
+                              e.currentTarget.style.color = 'var(--accent-cyan)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'none'
+                              e.currentTarget.style.color = 'var(--text-secondary)'
+                            }}
+                            title="View Replication Logs"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            onClick={() => executeProfile(p)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 6,
+                              borderRadius: 4,
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--bg-hover)'
+                              e.currentTarget.style.color = 'var(--accent-green)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'none'
+                              e.currentTarget.style.color = 'var(--text-secondary)'
+                            }}
+                            title="Execute Profile"
+                          >
+                            <Play size={14} />
+                          </button>
+                          <button
+                            onClick={() => loadProfileIntoWizard(p)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 6,
+                              borderRadius: 4,
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'var(--bg-hover)'
+                              e.currentTarget.style.color = 'var(--accent-cyan)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'none'
+                              e.currentTarget.style.color = 'var(--text-secondary)'
+                            }}
+                            title="Edit Connection Profile"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderTop: '1px solid var(--border-dim)' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
