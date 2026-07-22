@@ -300,13 +300,28 @@ const ReplicateStep = () => {
                     const failed = itemEvents.some(e => e.status === 'ITEM_FAILED' || e.step === 'ITEM_FAILED')
                     const status = finished ? 'Success' : failed ? 'Failed' : 'Pending'
 
-                    // Parse row counts dynamically from event logs
-                    let sourceRows = item.row_count || 0
+                    // Parse row counts dynamically from item metadata and event logs
+                    let sourceRows = item.row_count || item.rows || item.count || item.size_rows || 0
                     let inserted = 0
                     let failedRows = 0
 
                     const messages = [...itemEvents].reverse().map(e => e.message || '').filter(Boolean)
                     for (const msg of messages) {
+                      const totMatch = msg.match(/Total rows in source (?:'[^']+'|"[^"]+"):?\s*(\d+,?\d*)/i)
+                      if (totMatch) {
+                        sourceRows = parseInt(totMatch[1].replace(/,/g, ''), 10)
+                        break
+                      }
+                      const srcHasMatch = msg.match(/Source (?:has |\()(\d+,?\d*)\s*rows/i)
+                      if (srcHasMatch) {
+                        sourceRows = parseInt(srcHasMatch[1].replace(/,/g, ''), 10)
+                        break
+                      }
+                      const chunkMatch = msg.match(/Extracting Ascending Chunk #\d+ \(\d+ to (\d+,?\d*) rows\)/i)
+                      if (chunkMatch) {
+                        sourceRows = parseInt(chunkMatch[1].replace(/,/g, ''), 10)
+                        break
+                      }
                       const extMatch = msg.match(/extracted\s+(\d+,?\d*)\s+rows/i)
                       if (extMatch) {
                         sourceRows = parseInt(extMatch[1].replace(/,/g, ''), 10)
@@ -314,13 +329,42 @@ const ReplicateStep = () => {
                       }
                     }
 
+                    let insCount = 0
+                    let updCount = 0
+                    let delCount = 0
+                    let uncCount = 0
+
                     let foundSync = false
                     for (const msg of messages) {
-                      const syncMatch = msg.match(/successfully synced:\s*(\d+,?\d*)\s*inserted,\s*(\d+,?\d*)\s*updated/i)
+                      const breakdownMatch = msg.match(/Breakdown:\s*🟢\s*(\d+,?\d*)\s*Inserted\s*\|\s*🟡\s*(\d+,?\d*)\s*Updated\s*\|\s*🔴\s*(\d+,?\d*)\s*Deleted\s*\|\s*🔵\s*(\d+,?\d*)\s*Unchanged/i)
+                      if (breakdownMatch) {
+                        insCount = parseInt(breakdownMatch[1].replace(/,/g, ''), 10)
+                        updCount = parseInt(breakdownMatch[2].replace(/,/g, ''), 10)
+                        delCount = parseInt(breakdownMatch[3].replace(/,/g, ''), 10)
+                        uncCount = parseInt(breakdownMatch[4].replace(/,/g, ''), 10)
+                        inserted = insCount + updCount + uncCount
+                        foundSync = true
+                        break
+                      }
+                      const syncMatch = msg.match(/(\d+,?\d*)\s*inserted,\s*(\d+,?\d*)\s*updated,\s*(\d+,?\d*)\s*deleted\s*\|\s*(\d+,?\d*)\s*kept as-is/i)
                       if (syncMatch) {
-                        const ins = parseInt(syncMatch[1].replace(/,/g, ''), 10)
-                        const upd = parseInt(syncMatch[2].replace(/,/g, ''), 10)
-                        inserted = ins + upd
+                        insCount = parseInt(syncMatch[1].replace(/,/g, ''), 10)
+                        updCount = parseInt(syncMatch[2].replace(/,/g, ''), 10)
+                        delCount = parseInt(syncMatch[3].replace(/,/g, ''), 10)
+                        uncCount = parseInt(syncMatch[4].replace(/,/g, ''), 10)
+                        inserted = insCount + updCount + uncCount
+                        foundSync = true
+                        break
+                      }
+                      const tgtMatch = msg.match(/Target (?:has )?\(?(\d+,?\d*)\s*rows\)?/i)
+                      if (tgtMatch) {
+                        inserted = parseInt(tgtMatch[1].replace(/,/g, ''), 10)
+                        foundSync = true
+                        break
+                      }
+                      const incMatch = msg.match(/successfully (?:incrementally )?synced\s+(\d+,?\d*)\s+rows/i)
+                      if (incMatch) {
+                        inserted = parseInt(incMatch[1].replace(/,/g, ''), 10)
                         foundSync = true
                         break
                       }
@@ -330,6 +374,10 @@ const ReplicateStep = () => {
                         foundSync = true
                         break
                       }
+                    }
+
+                    if (sourceRows === 0 && (insCount > 0 || updCount > 0 || uncCount > 0)) {
+                      sourceRows = insCount + updCount + uncCount
                     }
 
                     if (!foundSync && finished) {
@@ -363,6 +411,10 @@ const ReplicateStep = () => {
                       sourceRows: sourceRows,
                       targetTable: tgtPlatform,
                       inserted: inserted,
+                      insCount: insCount,
+                      updCount: updCount,
+                      delCount: delCount,
+                      uncCount: uncCount,
                       failedRows: failedRows,
                       status: status
                     }

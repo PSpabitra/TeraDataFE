@@ -1135,7 +1135,7 @@ export default function LogsPage() {
                       {graphMessage.text}
                     </span>
                   )}
-                  {/* <Btn
+                  <Btn
                     variant="outline"
                     size="sm"
                     onClick={handleAddToKnowledgeGraph}
@@ -1143,7 +1143,7 @@ export default function LogsPage() {
                     icon={<GitBranch size={13} />}
                   >
                     {generatingGraph ? 'Adding...' : selectedRun?.kg_generated === 1 ? 'Added' : 'Add to Knowledge Graph'}
-                  </Btn> */}
+                  </Btn>
                 </div>
               </div>
 
