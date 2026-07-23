@@ -40,6 +40,12 @@ const SqlServerForm = ({ values, onChange }) => {
           placeholder="1433"
         />
       </div>
+      <Field
+        label="Target Schema"
+        value={values.schema || ''}
+        onChange={v => onChange('schema', v)}
+        placeholder="dbo"
+      />
     </>
   )
 }

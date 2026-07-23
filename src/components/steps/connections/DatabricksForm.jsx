@@ -31,6 +31,20 @@ const DatabricksForm = ({ values, onChange }) => {
         onChange={v => onChange('warehouse_id', v)}
         placeholder="abc123def"
       />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Field
+          label="Target Catalog"
+          value={values.database || ''}
+          onChange={v => onChange('database', v)}
+          placeholder="main"
+        />
+        <Field
+          label="Target Schema"
+          value={values.schema || ''}
+          onChange={v => onChange('schema', v)}
+          placeholder="default"
+        />
+      </div>
     </>
   )
 }

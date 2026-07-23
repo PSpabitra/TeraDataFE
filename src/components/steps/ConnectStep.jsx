@@ -222,8 +222,8 @@ const ConnectStep = () => {
                 warehouse_id: tCred.warehouse_id || '',
                 username: tCred.username || '',
                 password: tCred.password || '',
-                database: tCred.database_name || '',
-                schema: tCred.schema || (finalTargetPlatform === 'snowflake' ? 'PUBLIC' : finalTargetPlatform === 'sqlserver' ? 'dbo' : '')
+                database: tCred.database_name || (finalTargetPlatform === 'databricks' ? 'main' : ''),
+                schema: tCred.schema || (finalTargetPlatform === 'snowflake' ? 'PUBLIC' : finalTargetPlatform === 'sqlserver' ? 'dbo' : finalTargetPlatform === 'postgres' ? 'public' : finalTargetPlatform === 'databricks' ? 'default' : '')
               })
             }
           }
@@ -259,8 +259,8 @@ const ConnectStep = () => {
       warehouse_id: cred.warehouse_id || '',
       username: cred.username || '',
       password: cred.password || '',
-      database: cred.database_name || '',
-      schema: cred.schema || (platform === 'snowflake' ? 'PUBLIC' : platform === 'sqlserver' ? 'dbo' : '')
+      database: cred.database_name || (platform === 'databricks' ? 'main' : ''),
+      schema: cred.schema || (platform === 'snowflake' ? 'PUBLIC' : platform === 'sqlserver' ? 'dbo' : platform === 'postgres' ? 'public' : platform === 'databricks' ? 'default' : '')
     })
     setTgtResult(null)
   }
