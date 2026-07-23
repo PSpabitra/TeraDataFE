@@ -35,8 +35,11 @@ const DatastageForm = ({ values, onChange }) => {
         />
         <Field
           label="Project ID"
-          value={values.project_id}
-          onChange={v => onChange('project_id', v)}
+          value={values.database || values.project_id || ''}
+          onChange={v => {
+            onChange('project_id', v);
+            onChange('database', v);
+          }}
           placeholder="41001099-5063-403c-ac77-f22e32e77fe0"
           required
         />

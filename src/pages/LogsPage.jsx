@@ -934,16 +934,18 @@ export default function LogsPage() {
                     <span><strong>Volume:</strong> {selectedRun.size || '—'}</span>
                   </div>
                 </div>
-                <a
-                  href={`${API}/graphs/${selectedRun.connection_name || 'default_connection'}.html`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ textDecoration: 'none' }}
-                >
-                  {/* <Btn variant="outline" size="sm" icon={<ExternalLink size={13} />}>
-                    Lineage Graph
-                  </Btn> */}
-                </a>
+                {selectedRun?.kg_generated === 1 && (
+                  <a
+                    href={`${API}/graphs/${selectedRun.connection_name || 'default_connection'}.html`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Btn variant="outline" size="sm" icon={<ExternalLink size={13} />}>
+                      View Lineage Graph
+                    </Btn>
+                  </a>
+                )}
               </div>
 
               {/* Migration summary: source→target + stats */}
