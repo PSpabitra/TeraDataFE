@@ -11,7 +11,7 @@ import { SOURCES, TARGETS } from '../../config/platforms'
 import { useMigration } from '../../context/MigrationContext'
 
 const ALLOWED_TARGETS = {
-  teradata: ['databricks'],
+  teradata: ['databricks', 'snowflake'],
   mysql: ['sqlserver', 'databricks'],
   mssql: ['databricks', 'mysql'],
   postgres: ['databricks'],
