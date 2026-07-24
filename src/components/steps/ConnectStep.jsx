@@ -205,6 +205,8 @@ const ConnectStep = () => {
               username: c.username || '',
               password: c.password || '',
               database: c.database_name || '',
+              project_name: c.project_name || '',
+              project_id: c.project_id || '',
               port: String(c.port || SOURCES[defaultSourcePlatform]?.defaultPort || '')
             }))
 
@@ -239,6 +241,8 @@ const ConnectStep = () => {
       username: cred.username || '',
       password: cred.password || '',
       database: cred.database_name || '',
+      project_name: cred.project_name || '',
+      project_id: cred.project_id || '',
       port: String(cred.port || SOURCES[platform]?.defaultPort || '')
     })
     setSrcResult(null)
