@@ -57,9 +57,15 @@ export default function DashboardPage() {
       if (r.size) {
         const num = parseFloat(r.size)
         if (!isNaN(num)) {
-          if (r.size.toUpperCase().includes('GB')) {
+          const upperSize = r.size.toUpperCase()
+          if (upperSize.includes('GB') || upperSize.includes('G')) {
             totalVolumeGB += num
-          } else if (r.size.toUpperCase().includes('MB')) {
+          } else if (upperSize.includes('MB') || upperSize.includes('M')) {
+            totalVolumeGB += num / 1024
+          } else if (upperSize.includes('KB') || upperSize.includes('K')) {
+            totalVolumeGB += num / (1024 * 1024)
+          } else {
+            // Assume MB if no unit is found but it's a number
             totalVolumeGB += num / 1024
           }
         }
@@ -70,9 +76,20 @@ export default function DashboardPage() {
   })
 
   const successRate = totalRuns > 0 ? ((successfulRuns / totalRuns) * 100).toFixed(2) + '%' : '100%'
-  const formattedVolume = totalVolumeGB >= 1024 
-    ? (totalVolumeGB / 1024).toFixed(2) + ' TB' 
-    : totalVolumeGB.toFixed(1) + ' GB'
+  
+  let formattedVolume = '0.0 GB'
+  if (totalVolumeGB >= 1024) {
+    formattedVolume = (totalVolumeGB / 1024).toFixed(2) + ' TB'
+  } else if (totalVolumeGB >= 1) {
+    formattedVolume = totalVolumeGB.toFixed(1) + ' GB'
+  } else if (totalVolumeGB > 0) {
+    const totalVolumeMB = totalVolumeGB * 1024
+    if (totalVolumeMB >= 1) {
+      formattedVolume = totalVolumeMB.toFixed(1) + ' MB'
+    } else {
+      formattedVolume = (totalVolumeMB * 1024).toFixed(1) + ' KB'
+    }
+  }
 
   const metrics = [
     { label: 'Total Data Migrated', value: formattedVolume, change: 'Stable', icon: <TrendingUp size={16} />, color: 'cyan' },
